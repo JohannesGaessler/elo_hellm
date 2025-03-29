@@ -36,6 +36,3 @@ for i in range(predictions.shape[0]):
 probs_label = predictions[np.arange(predictions.shape[0]), labels]
 print(np.mean(probs_label))
 print(np.mean(np.argmax(predictions, axis=1) == labels))
-
-# for ex, result in zip(mmlu["test"], properties):
-    # pass

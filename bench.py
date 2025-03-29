@@ -1,16 +1,25 @@
 #!/usr/bin/env python3
 
-from typing import List
+import json
+import os
+from time import sleep
+from typing import Dict, List
 
 import datasets
+import numpy as np
 import requests
-from tqdm import tqdm
+import subprocess
+from tqdm.contrib.concurrent import process_map
+import yaml
 
-# SERVER_ADDRESS = "http://johannes-romed82t-00:8357"
-SERVER_ADDRESS = "http://localhost:8080"
+with open("config.yml") as f:
+    config: dict = yaml.safe_load(f)
 
-response = requests.get(f"{SERVER_ADDRESS}/health")
-assert response.status_code == 200
+PARALLEL = 8
+CTX_SIZE = 4096
+PORT = 1337
+
+SERVER_ADDRESS = f"http://localhost:{PORT}"
 
 mmlu = datasets.load_dataset("cais/mmlu", "all")
 
@@ -26,12 +35,11 @@ GRAMMAR = "root ::= [abcd]"
 # GRAMMAR = "root ::= [ABC]"
 # GRAMMAR = "root ::= \"a\""
 
-jsonl_lines: List[str] = []
 
-for i, ex in tqdm(list(enumerate(mmlu["test"]))):
-    question: str = ex["question"]
-    choices: List[str] = ex["choices"]
-    answer: int = ex["answer"]
+def process_mmlu(example: dict) -> List[float]:
+    question: str = example["question"]
+    choices: List[str] = example["choices"]
+    answer: int = example["answer"]
 
     assert type(question) is str
     assert type(choices) is list
@@ -55,7 +63,61 @@ for i, ex in tqdm(list(enumerate(mmlu["test"]))):
             post_sampling_probs=True,
         )
     )
-    jsonl_lines.append(f"{response.text}\n")
+    if response.status_code != 200:
+        server_process.terminate()
+        raise RuntimeError(f"Server returned status code {response.status_code}: {response.text}")
 
-with open("results.jsonl", "w") as f:
-    f.writelines(jsonl_lines)
+    response_dict: dict = json.loads(response.text)
+    predictions = [-1.0] * 4
+    for i in range(4):
+        token_info: dict = response_dict["completion_probabilities"][0]["top_probs"][i]
+        if token_info["token"] == "a":
+            predictions[0] = token_info["prob"]
+        elif token_info["token"] == "b":
+            predictions[1] = token_info["prob"]
+        elif token_info["token"] == "c":
+            predictions[2] = token_info["prob"]
+        elif token_info["token"] == "d":
+            predictions[3] = token_info["prob"]
+        else:
+            assert False
+    return predictions
+
+
+for model in config["models"]:
+    name: str = model["name"]
+    quantizations: List[str] = model.get("quantizations", config["quantizations"])
+    filepath_template: str = model.get("filepath", config["filepath"])
+
+    for quant in quantizations:
+        filepath: str = filepath_template.format(name=name, quantization=quant)
+        dir_out: str = os.path.join("out", "bench", name, quant)
+        os.makedirs(dir_out, exist_ok=True)
+
+        popen_args: List[str] = [
+            config["server_binary"],
+            "--n-gpu-layers", "999",
+            "--parallel", str(PARALLEL),
+            "--ctx-size", str(PARALLEL * CTX_SIZE),
+            "--model", filepath,
+            "--port", str(PORT),
+        ]
+        popen_env: Dict[str, str] = dict(
+            CUDA_VISIBLE_DEVICES="0",
+        )
+        with open(os.path.join(dir_out, "srvr_out.log"), "w") as fstdout, open(os.path.join(dir_out, "srvr_err.log"), "w") as fstderr:
+            server_process = subprocess.Popen(popen_args, env=popen_env, stdout=fstdout, stderr=fstderr)
+            while True:
+                try:
+                    sleep(1.0)
+                    response = requests.get(f"{SERVER_ADDRESS}/health")
+                    if response.status_code == 200:
+                        break
+                except requests.ConnectionError:
+                    pass
+
+            os.makedirs(os.path.join(dir_out, "mmlu"), exist_ok=True)
+            predictions = process_map(process_mmlu, list(mmlu["test"]), max_workers=PARALLEL, chunksize=10)
+            np.save(os.path.join(dir_out, "mmlu", "predictions.npy"), predictions)
+
+            server_process.terminate()
