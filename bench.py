@@ -23,11 +23,12 @@ SERVER_ADDRESS = f"http://localhost:{PORT}"
 
 mmlu = datasets.load_dataset("cais/mmlu", "all")
 
-TEMPLATE_MMLU = """Question: {question}
+TEMPLATE_PROMPT_MMLU = """{question}
 
-{choices_block}
+Which of the following answers is correct?
+{choices_block}"""
 
-Solution: The correct answer is ("""
+TEMPLATE_RESPONSE_MMLU = """The correct answer is ("""
 
 LETTERS = ["a", "b", "c", "d"]
 GRAMMAR = "root ::= [abcd]"
@@ -48,7 +49,18 @@ def process_mmlu(example: dict) -> List[float]:
     choices = [f"({LETTERS[i]}): {choice_i}" for i, choice_i in enumerate(choices)]
     choices_block: str = "\n".join(choices)
 
-    prompt: str = TEMPLATE_MMLU.format(question=question, choices_block=choices_block)
+    messages: List[str] = [
+        dict(role="user", content=TEMPLATE_PROMPT_MMLU.format(question=question, choices_block=choices_block)),
+    ]
+    response = requests.post(
+        f"{SERVER_ADDRESS}/apply-template",
+        json=dict(messages=messages)
+    )
+    if response.status_code != 200:
+        server_process.terminate()
+        raise RuntimeError(f"Server returned status code {response.status_code}: {response.text}")
+    prompt: str = json.loads(response.text)["prompt"]
+    prompt += TEMPLATE_RESPONSE_MMLU
 
     response = requests.post(
         f"{SERVER_ADDRESS}/completion",
