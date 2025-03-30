@@ -1,7 +1,15 @@
-server_binary: /home/johannesg/Projects/llama.cpp/build/bin/llama-server
-filepath: /opt/models/{name}-{quantization}.gguf
+path_server: /home/johannesg/Projects/llama.cpp/build/bin/llama-server
+path_quantize: /home/johannesg/Projects/llama.cpp/build/bin/llama-quantize
+path_model: /opt/models/{name}-{quantization}.gguf
+path_imatrix: /opt/models/{name}.imatrix
 quantizations:
   - f16
+  - q8_0
+  # - q6_k
+  # - q5_k_m
+  # - q4_k_m
+  # - q3_k_m
+  # - q2_k
 
 models:
   - name: llama_3.2_instruct-1b

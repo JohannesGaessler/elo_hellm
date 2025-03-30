@@ -1,43 +1,92 @@
 #!/usr/bin/env python3
 
+from copy import deepcopy
 import json
+from multiprocessing import Pool
 import os
 from time import sleep
+import threading
 from typing import Dict, List
 
 import datasets
 import numpy as np
 import requests
 import subprocess
-from tqdm.contrib.concurrent import process_map
 import yaml
 
 with open("config.yml") as f:
     config: dict = yaml.safe_load(f)
 
+model_list: List[dict] = []
+for model in config["models"]:
+    name: str = model["name"]
+    quantizations: List[str] = model.get("quantizations", config["quantizations"])
+    path_model_template: str = model.get("path_model", config["path_model"])
+    path_imatrix_template: str = model.get("path_imatrix", config["path_imatrix"])
+
+    for quant in quantizations:
+        path_model: str = path_model_template.format(name=name, quantization=quant)
+        dir_out: str = os.path.join("out", "bench", name, quant)
+        os.makedirs(dir_out, exist_ok=True)
+
+        env: Dict[str, str] = dict(
+            CUDA_VISIBLE_DEVICES="0",
+        )
+
+        if not os.path.exists(path_model):
+            assert quant != "f16"
+            path_model_f16: str = path_model_template.format(name=name, quantization="f16")
+            path_imatrix: str = path_imatrix_template.format(name=name)
+            assert os.path.exists(path_model_f16)
+            print(f"Model {path_model} does not exist, quantizing from f16...")
+            with open(os.path.join(dir_out, f"quantize.out"), "w") as fout, open(os.path.join(dir_out, f"quantize.err"), "w") as ferr:
+                returncode = subprocess.run(
+                    [config["path_quantize"], "--imatrix", path_imatrix, path_model_f16, path_model, quant, "8"],
+                    stdout=fout,
+                    stderr=ferr,
+                    env=env,
+                ).returncode
+                assert returncode == 0
+
+        file_size: int = os.path.getsize(path_model)
+
+        model_list.append(dict(name=name, quantization=quant, path_model=path_model, file_size=file_size))
+
+model_list = sorted(model_list, key=lambda m: m["file_size"], reverse=True)
+
 PARALLEL = 8
 CTX_SIZE = 4096
-PORT = 1337
 
-SERVER_ADDRESS = f"http://localhost:{PORT}"
+LETTERS = ["a", "b", "c", "d", "e", "f", "g", "h", "i"]
 
-mmlu = datasets.load_dataset("cais/mmlu", "all")
+TEMPLATE_SERVER_ADDRESS = "http://localhost:{port}"
 
-TEMPLATE_PROMPT_MMLU = """{question}
+TEMPLATE_PROMPT_MULTIPLE_CHOICE = """{question}
 
 Which of the following answers is correct?
 {choices_block}"""
 
-TEMPLATE_RESPONSE_MMLU = """The correct answer is ("""
 
-LETTERS = ["a", "b", "c", "d"]
-GRAMMAR = "root ::= [abcd]"
-# GRAMMAR = "root ::= [abc]"
-# GRAMMAR = "root ::= [ABC]"
-# GRAMMAR = "root ::= \"a\""
+def get_choices_block(choices: List[str]) -> str:
+    choices = [f"({letter}): {choice}" for letter, choice in zip(LETTERS, choices)]
+    return "\n".join(choices)
 
 
-def process_mmlu(example: dict) -> List[float]:
+def get_grammar(num_choices: int) -> str:
+    return f"root ::= [{''.join(LETTERS[:num_choices])}]"
+
+
+TEMPLATE_RESPONSE_MULTIPLE_CHOICE = """The correct answer is ("""
+
+dataset_list = []
+
+print("Loading MMLU...")
+mmlu = datasets.load_dataset("cais/mmlu", "all")
+dataset_list.append(dict(name="mmlu_test", type="multiple_choice", data=mmlu["test"]))
+
+
+def process_example(example: dict) -> List[float]:
+    server_address = example["server_address"]
     question: str = example["question"]
     choices: List[str] = example["choices"]
     answer: int = example["answer"]
@@ -46,29 +95,28 @@ def process_mmlu(example: dict) -> List[float]:
     assert type(choices) is list
     assert type(answer) is int
 
-    choices = [f"({LETTERS[i]}): {choice_i}" for i, choice_i in enumerate(choices)]
-    choices_block: str = "\n".join(choices)
+    num_choices: int = len(choices)
+    choices_block: str = get_choices_block(choices)
 
     messages: List[str] = [
-        dict(role="user", content=TEMPLATE_PROMPT_MMLU.format(question=question, choices_block=choices_block)),
+        dict(role="user", content=TEMPLATE_PROMPT_MULTIPLE_CHOICE.format(question=question, choices_block=choices_block)),
     ]
     response = requests.post(
-        f"{SERVER_ADDRESS}/apply-template",
+        f"{server_address}/apply-template",
         json=dict(messages=messages)
     )
     if response.status_code != 200:
-        server_process.terminate()
         raise RuntimeError(f"Server returned status code {response.status_code}: {response.text}")
     prompt: str = json.loads(response.text)["prompt"]
-    prompt += TEMPLATE_RESPONSE_MMLU
+    prompt += TEMPLATE_RESPONSE_MULTIPLE_CHOICE
 
     response = requests.post(
-        f"{SERVER_ADDRESS}/completion",
+        f"{server_address}/completion",
         json=dict(
             prompt=prompt,
-            grammar=GRAMMAR,
+            grammar=get_grammar(num_choices),
             n_predict=1,
-            n_probs=4,
+            n_probs=num_choices,
             top_k=0,
             top_p=1.0,
             min_p=0.0,
@@ -76,60 +124,98 @@ def process_mmlu(example: dict) -> List[float]:
         )
     )
     if response.status_code != 200:
-        server_process.terminate()
         raise RuntimeError(f"Server returned status code {response.status_code}: {response.text}")
 
     response_dict: dict = json.loads(response.text)
-    predictions = [-1.0] * 4
-    for i in range(4):
+    predictions = [-1.0] * num_choices
+    for i in range(num_choices):
         token_info: dict = response_dict["completion_probabilities"][0]["top_probs"][i]
-        if token_info["token"] == "a":
-            predictions[0] = token_info["prob"]
-        elif token_info["token"] == "b":
-            predictions[1] = token_info["prob"]
-        elif token_info["token"] == "c":
-            predictions[2] = token_info["prob"]
-        elif token_info["token"] == "d":
-            predictions[3] = token_info["prob"]
-        else:
-            assert False
+        index_token: int = LETTERS.index(token_info["token"])
+        predictions[index_token] = token_info["prob"]
     return predictions
 
 
-for model in config["models"]:
+def process_model(model, gpu_id: int):
+    port = 1337 + gpu_id
+    server_address = TEMPLATE_SERVER_ADDRESS.format(port=port)
+
     name: str = model["name"]
-    quantizations: List[str] = model.get("quantizations", config["quantizations"])
-    filepath_template: str = model.get("filepath", config["filepath"])
+    quant: str = model["quantization"]
+    path_model: str = model["path_model"]
+    dir_out: str = os.path.join("out", "bench", name, quant)
+    os.makedirs(dir_out, exist_ok=True)
 
-    for quant in quantizations:
-        filepath: str = filepath_template.format(name=name, quantization=quant)
-        dir_out: str = os.path.join("out", "bench", name, quant)
-        os.makedirs(dir_out, exist_ok=True)
+    env: Dict[str, str] = dict(
+        CUDA_VISIBLE_DEVICES=str(gpu_id),
+    )
 
-        popen_args: List[str] = [
-            config["server_binary"],
-            "--n-gpu-layers", "999",
-            "--parallel", str(PARALLEL),
-            "--ctx-size", str(PARALLEL * CTX_SIZE),
-            "--model", filepath,
-            "--port", str(PORT),
-        ]
-        popen_env: Dict[str, str] = dict(
-            CUDA_VISIBLE_DEVICES="0",
-        )
-        with open(os.path.join(dir_out, "srvr_out.log"), "w") as fstdout, open(os.path.join(dir_out, "srvr_err.log"), "w") as fstderr:
-            server_process = subprocess.Popen(popen_args, env=popen_env, stdout=fstdout, stderr=fstderr)
-            while True:
-                try:
-                    sleep(1.0)
-                    response = requests.get(f"{SERVER_ADDRESS}/health")
-                    if response.status_code == 200:
-                        break
-                except requests.ConnectionError:
-                    pass
+    popen_args: List[str] = [
+        config["path_server"],
+        "--n-gpu-layers", "999",
+        "--parallel", str(PARALLEL),
+        "--ctx-size", str(PARALLEL * CTX_SIZE),
+        "--model", path_model,
+        "--port", str(port),
+    ]
+    with open(os.path.join(dir_out, f"server.out"), "w") as fout, open(os.path.join(dir_out, f"server.err"), "w") as ferr:
+        server_process = subprocess.Popen(popen_args, env=env, stdout=fout, stderr=ferr)
+        while True:
+            try:
+                sleep(1.0)
+                response = requests.get(f"{server_address}/health")
+                if response.status_code == 200:
+                    break
+            except requests.ConnectionError:
+                pass
 
-            os.makedirs(os.path.join(dir_out, "mmlu"), exist_ok=True)
-            predictions = process_map(process_mmlu, list(mmlu["test"]), max_workers=PARALLEL, chunksize=10)
-            np.save(os.path.join(dir_out, "mmlu", "predictions.npy"), predictions)
+        for ds in dataset_list:
+            ds_name = ds["name"]
+            ds_type = ds["type"]
 
-            server_process.terminate()
+            assert ds_type == "multiple_choice"
+
+            data_modded = []
+            for ex in ds["data"]:
+                ex_copy = deepcopy(ex)
+                ex_copy["server_address"] = server_address
+                data_modded.append(ex_copy)
+
+            os.makedirs(os.path.join(dir_out, ds_name), exist_ok=True)
+
+            print(f"Start: {name}-{quant}, {ds_name}, gpu_id={gpu_id}, server_address={server_address}")
+            with Pool(PARALLEL) as pool:
+                predictions = pool.map(process_example, data_modded, chunksize=10)
+            np.save(os.path.join(dir_out, ds_name, "predictions.npy"), predictions)
+
+            labels = np.array([ex["answer"] for ex in data_modded])
+            np.save(os.path.join(dir_out, ds_name, "labels.npy"), labels)
+
+        server_process.terminate()
+
+
+lock = threading.Lock()
+
+
+def thread_target(gpu_id: int):
+    while True:
+        lock.acquire()
+        if not model_list:
+            lock.release()
+            break
+        model = model_list.pop(0)
+        lock.release()
+        process_model(model, gpu_id)
+
+
+NUM_GPUS = 6
+threads = []
+
+for i in range(1, NUM_GPUS):
+    t = threading.Thread(target=thread_target, args=[i])
+    t.start()
+    threads.append(t)
+
+thread_target(0)
+
+for i in range(1, NUM_GPUS):
+    threads[i - 1].join()
