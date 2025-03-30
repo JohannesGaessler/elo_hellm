@@ -1,38 +1,35 @@
 #!/usr/bin/env python3
 
-import json
-from time import sleep
+import os
 from typing import List
 
 import datasets
 import numpy as np
 
-results: List[dict] = []
-
-with open("results.jsonl", "r") as f:
-    for line in f.readlines():
-        results.append(json.loads(line))
+DIR_IN = os.path.join("out", "bench")
 
 mmlu = datasets.load_dataset("cais/mmlu", "all")
 labels = np.array([ex["answer"] for ex in mmlu["test"]])
 
-assert len(results) == labels.shape[0]
+models: List[str] = sorted(os.listdir(DIR_IN))
 
-predictions = np.zeros(labels.shape + (4,))
-for i in range(predictions.shape[0]):
-    for j in range(predictions.shape[1]):
-        token_info: dict = results[i]["completion_probabilities"][0]["top_probs"][j]
-        if token_info["token"] == "a":
-            predictions[i, 0] = token_info["prob"]
-        elif token_info["token"] == "b":
-            predictions[i, 1] = token_info["prob"]
-        elif token_info["token"] == "c":
-            predictions[i, 2] = token_info["prob"]
-        elif token_info["token"] == "d":
-            predictions[i, 3] = token_info["prob"]
-        else:
-            assert False
+for model in models:
+    dir_in_m: str = os.path.join(DIR_IN, model)
+    quantizations: List[str] = sorted(os.listdir(dir_in_m))
+    for quant in quantizations:
+        predictions = np.load(os.path.join(dir_in_m, quant, "mmlu", "predictions.npy"))
+        assert predictions.shape[0] == labels.shape[0]
+        assert predictions.shape[1] == 4
 
-probs_label = predictions[np.arange(predictions.shape[0]), labels]
-print(np.mean(probs_label))
-print(np.mean(np.argmax(predictions, axis=1) == labels))
+        probs_label = predictions[np.arange(predictions.shape[0]), labels]
+        print(f"====== {model}-{quant} ======")
+
+        confidence_mean = np.mean(probs_label)
+        confidence_unc = np.std(probs_label) / np.sqrt(probs_label.shape[0])
+        print(f"Confidence: {100*confidence_mean:.2f}+-{100*confidence_unc:.2f}%")
+
+        greedy_correct_mean = np.mean(np.argmax(predictions, axis=1) == labels)
+        greedy_correct_unc = np.sqrt(greedy_correct_mean * (1.0 - greedy_correct_mean) / predictions.shape[0])
+        print(f"Greedy correct: {100*greedy_correct_mean:.2f}+-{100*greedy_correct_unc:.2f}%")
+
+        print()
