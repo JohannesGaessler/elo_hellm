@@ -42,16 +42,23 @@ for model in models:
 
                 # predictions = sample_min_p(predictions, 0.9)
 
-                probs_label = predictions[np.arange(predictions.shape[0]), labels]
-                print(f"====== {model}-{quant} {dataset} cot={cot} ======")
+                if predictions.ndim == 1:
+                    greedy_correct_mean = np.mean(predictions == labels)
+                    greedy_correct_unc = np.sqrt(greedy_correct_mean * (1.0 - greedy_correct_mean) / predictions.shape[0])
+                    print(f"Greedy correct: {100*greedy_correct_mean:.2f}+-{100*greedy_correct_unc:.2f}%")
+                elif predictions.ndim == 2:
+                    probs_label = predictions[np.arange(predictions.shape[0]), labels]
+                    print(f"====== {model}-{quant} {dataset} cot={cot} ======")
 
-                confidence_mean = np.mean(probs_label)
-                confidence_unc = np.std(probs_label) / np.sqrt(probs_label.shape[0])
-                print(f"Confidence: {100*confidence_mean:.2f}+-{100*confidence_unc:.2f}%")
+                    confidence_mean = np.mean(probs_label)
+                    confidence_unc = np.std(probs_label) / np.sqrt(probs_label.shape[0])
+                    print(f"Confidence: {100*confidence_mean:.2f}+-{100*confidence_unc:.2f}%")
 
-                greedy_correct_mean = np.mean(np.argmax(predictions, axis=1) == labels)
-                greedy_correct_unc = np.sqrt(greedy_correct_mean * (1.0 - greedy_correct_mean) / predictions.shape[0])
-                print(f"Greedy correct: {100*greedy_correct_mean:.2f}+-{100*greedy_correct_unc:.2f}%")
+                    greedy_correct_mean = np.mean(np.argmax(predictions, axis=1) == labels)
+                    greedy_correct_unc = np.sqrt(greedy_correct_mean * (1.0 - greedy_correct_mean) / predictions.shape[0])
+                    print(f"Greedy correct: {100*greedy_correct_mean:.2f}+-{100*greedy_correct_unc:.2f}%")
+                else:
+                    assert False
 
                 print()
 
