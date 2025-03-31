@@ -76,7 +76,7 @@ Which of the following answers is correct?
 
 Think about the problem step-by-step."""
 
-TEMPLATE_PROMPT_MULTIPLE_CHOICE_COT_2 = """Please enter your final answer."""
+TEMPLATE_PROMPT_COT_2 = """Please enter your final answer."""
 
 TEMPLATE_RESPONSE_MULTIPLE_CHOICE_COT_2 = """My final answer is ("""
 
@@ -86,19 +86,28 @@ def get_choices_block(choices: List[str]) -> str:
     return "\n".join(choices)
 
 
-def get_grammar(num_choices: int) -> str:
+def get_grammar_multiple_choice(num_choices: int) -> str:
     return f"root ::= [{''.join(LETTERS[:num_choices])}]"
 
+
+TEMPLATE_RESPONSE_MATH = """The correct answer is """
+TEMPLATE_RESPONSE_MATH_COT_2 = """My final answer is """
+TEMPLATE_GRAMMAR_MATH = "root ::= [0-9]+.*"
 
 dataset_list = []
 
 print("Loading MMLU...")
 mmlu = datasets.load_dataset("cais/mmlu", "all")
-dataset_list.append(dict(name="mmlu_test", type="multiple_choice", data=mmlu["test"]))
 dataset_list.append(dict(name="mmlu_val", type="multiple_choice", data=mmlu["validation"]))
+dataset_list.append(dict(name="mmlu_test", type="multiple_choice", data=mmlu["test"]))
+
+print("Loading GSM8K...")
+gsm8k = datasets.load_dataset("openai/gsm8k", "main")
+dataset_list.append(dict(name="gsm8k_train", type="math", data=gsm8k["train"]))
+dataset_list.append(dict(name="gsm8k_test", type="math", data=gsm8k["test"]))
 
 
-def process_example(example: dict) -> List[float]:
+def process_multiple_choice(example: dict) -> List[float]:
     server_address = example["server_address"]
     cot: bool = example["cot"]
     question: str = example["question"]
@@ -136,7 +145,7 @@ def process_example(example: dict) -> List[float]:
             raise RuntimeError(f"Server returned status code {response.status_code}: {response.text}")
         response_dict: dict = json.loads(response.text)
         messages.append(dict(role="assistant", content=response_dict["content"]))
-        messages.append(dict(role="user", content=TEMPLATE_PROMPT_MULTIPLE_CHOICE_COT_2))
+        messages.append(dict(role="user", content=TEMPLATE_PROMPT_COT_2))
 
         response = requests.post(
             f"{server_address}/apply-template",
@@ -163,7 +172,7 @@ def process_example(example: dict) -> List[float]:
         f"{server_address}/completion",
         json=dict(
             prompt=prompt,
-            grammar=get_grammar(num_choices),
+            grammar=get_grammar_multiple_choice(num_choices),
             n_predict=1,
             n_probs=num_choices,
             top_k=0,
@@ -182,6 +191,81 @@ def process_example(example: dict) -> List[float]:
         index_token: int = LETTERS.index(token_info["token"])
         predictions[index_token] = token_info["prob"]
     return predictions
+
+
+def process_math(example: dict) -> List[float]:
+    server_address = example["server_address"]
+    cot: bool = example["cot"]
+    question: str = example["question"]
+    answer: int = example["answer"]
+
+    assert type(question) is str
+    assert type(answer) is int
+
+    messages: List[str] = [
+        dict(role="user", content=question),
+    ]
+    response = requests.post(
+        f"{server_address}/apply-template",
+        json=dict(messages=messages)
+    )
+    if response.status_code != 200:
+        raise RuntimeError(f"Server returned status code {response.status_code}: {response.text}")
+    prompt: str = json.loads(response.text)["prompt"]
+
+    if cot:
+        response = requests.post(
+            f"{server_address}/completion",
+            json=dict(
+                prompt=prompt,
+                n_predict=CTX_SIZE // 2,
+                temperature=0.0,
+            )
+        )
+        if response.status_code != 200:
+            raise RuntimeError(f"Server returned status code {response.status_code}: {response.text}")
+        response_dict: dict = json.loads(response.text)
+        messages.append(dict(role="assistant", content=response_dict["content"]))
+        messages.append(dict(role="user", content=TEMPLATE_PROMPT_COT_2))
+
+        response = requests.post(
+            f"{server_address}/apply-template",
+            json=dict(messages=messages)
+        )
+        if response.status_code != 200:
+            raise RuntimeError(f"Server returned status code {response.status_code}: {response.text}")
+        prompt: str = json.loads(response.text)["prompt"]
+        prompt += TEMPLATE_RESPONSE_MATH_COT_2
+    else:
+        prompt += TEMPLATE_RESPONSE_MATH
+
+    response = requests.post(
+        f"{server_address}/completion",
+        json=dict(
+            prompt=prompt,
+            grammar=TEMPLATE_GRAMMAR_MATH,
+            n_predict=10,
+            temperature=0.0,
+        )
+    )
+    if response.status_code != 200:
+        raise RuntimeError(f"Server returned status code {response.status_code}: {response.text}")
+
+    response_dict: dict = json.loads(response.text)
+    content: str = response_dict["content"]
+    try:
+        index_period: int = content.find(".")
+    except ValueError:
+        index_period: int = len(content)
+    try:
+        index_space: int = content.find(".")
+    except ValueError:
+        index_space: int = len(content)
+    try:
+        prediction: int = int(content[:min(index_period, index_space)])
+    except ValueError:
+        prediction: int = 123456789
+    return prediction
 
 
 def process_model(model, gpu_id: int):
@@ -238,8 +322,6 @@ def process_model(model, gpu_id: int):
             ds_name = ds["name"]
             ds_type = ds["type"]
 
-            assert ds_type == "multiple_choice"
-
             os.makedirs(os.path.join(dir_out, ds_name), exist_ok=True)
 
             labels = np.array([ex["answer"] for ex in ds["data"]])
@@ -265,7 +347,12 @@ def process_model(model, gpu_id: int):
                 print(f"Start: {name}-{quant}, {ds_name}, cot={cot}, gpu_id={gpu_id}, server_address={server_address}")
                 t0 = time()
                 with Pool(PARALLEL) as pool:
-                    predictions = pool.map(process_example, data_modded, chunksize=10)
+                    if ds_type == "multiple_choice":
+                        predictions = pool.map(process_multiple_choice, data_modded, chunksize=10)
+                    elif ds_type == "math":
+                        predictions = pool.map(process_math, data_modded, chunksize=10)
+                    else:
+                        assert False
                 print(f"Done: {name}-{quant}, {ds_name}, cot={cot}, time={time() - t0:.2f}s")
                 np.save(target, predictions)
 
