@@ -8,7 +8,7 @@ import numpy as np
 from scipy.stats import binom
 
 DIR_IN = os.path.join("out", "bench")
-DATASETS: List[str] = ["mmlu_test"]
+DATASETS: List[str] = ["gsm8k_train", "gsm8k_test", "mmlu_test", "mmlu_train"]
 
 models: List[str] = sorted(os.listdir(DIR_IN))
 
@@ -29,10 +29,15 @@ for model in models:
         dir_in_mq: str = os.path.join(dir_in_m, quant)
         for dataset in DATASETS:
             dir_in_mqd: str = os.path.join(dir_in_mq, dataset)
+            if not os.path.exists(dir_in_mqd):
+                continue
             labels = np.load(os.path.join(dir_in_mqd, "labels.npy"))
 
             for cot in [False, True]:
-                predictions = np.load(os.path.join(dir_in_mqd, f"pred-cot{1 if cot else 0}.npy"))
+                path_pred: str = os.path.join(dir_in_mqd, f"pred-cot{1 if cot else 0}.npy")
+                if not os.path.exists(path_pred):
+                    continue
+                predictions = np.load(path_pred)
                 assert predictions.shape[0] == labels.shape[0]
                 assert predictions.shape[1] == 4
 
@@ -51,6 +56,8 @@ for model in models:
 
                 print()
 
+
+assert False
 
 model_list = []
 for model in models:
