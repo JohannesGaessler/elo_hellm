@@ -4,7 +4,7 @@ from copy import deepcopy
 import json
 from multiprocessing import Pool
 import os
-from time import sleep
+from time import sleep, time
 import threading
 from typing import Dict, List
 
@@ -66,6 +66,19 @@ TEMPLATE_PROMPT_MULTIPLE_CHOICE = """{question}
 Which of the following answers is correct?
 {choices_block}"""
 
+TEMPLATE_RESPONSE_MULTIPLE_CHOICE = """The correct answer is ("""
+
+TEMPLATE_PROMPT_MULTIPLE_CHOICE_COT_1 = """{question}
+
+Which of the following answers is correct?
+{choices_block}
+
+Think about the problem step-by-step."""
+
+TEMPLATE_PROMPT_MULTIPLE_CHOICE_COT_2 = """Please enter your final answer."""
+
+TEMPLATE_RESPONSE_MULTIPLE_CHOICE_COT_2 = """My final answer is ("""
+
 
 def get_choices_block(choices: List[str]) -> str:
     choices = [f"({letter}): {choice}" for letter, choice in zip(LETTERS, choices)]
@@ -76,8 +89,6 @@ def get_grammar(num_choices: int) -> str:
     return f"root ::= [{''.join(LETTERS[:num_choices])}]"
 
 
-TEMPLATE_RESPONSE_MULTIPLE_CHOICE = """The correct answer is ("""
-
 dataset_list = []
 
 print("Loading MMLU...")
@@ -87,6 +98,7 @@ dataset_list.append(dict(name="mmlu_test", type="multiple_choice", data=mmlu["te
 
 def process_example(example: dict) -> List[float]:
     server_address = example["server_address"]
+    cot: bool = example["cot"]
     question: str = example["question"]
     choices: List[str] = example["choices"]
     answer: int = example["answer"]
@@ -98,17 +110,52 @@ def process_example(example: dict) -> List[float]:
     num_choices: int = len(choices)
     choices_block: str = get_choices_block(choices)
 
-    messages: List[str] = [
-        dict(role="user", content=TEMPLATE_PROMPT_MULTIPLE_CHOICE.format(question=question, choices_block=choices_block)),
-    ]
-    response = requests.post(
-        f"{server_address}/apply-template",
-        json=dict(messages=messages)
-    )
-    if response.status_code != 200:
-        raise RuntimeError(f"Server returned status code {response.status_code}: {response.text}")
-    prompt: str = json.loads(response.text)["prompt"]
-    prompt += TEMPLATE_RESPONSE_MULTIPLE_CHOICE
+    if cot:
+        messages: List[str] = [
+            dict(role="user", content=TEMPLATE_PROMPT_MULTIPLE_CHOICE_COT_1.format(question=question, choices_block=choices_block)),
+        ]
+        response = requests.post(
+            f"{server_address}/apply-template",
+            json=dict(messages=messages)
+        )
+        if response.status_code != 200:
+            raise RuntimeError(f"Server returned status code {response.status_code}: {response.text}")
+        prompt: str = json.loads(response.text)["prompt"]
+
+        response = requests.post(
+            f"{server_address}/completion",
+            json=dict(
+                prompt=prompt,
+                n_predict=CTX_SIZE // 2,
+                temperature=0.0,
+            )
+        )
+        if response.status_code != 200:
+            raise RuntimeError(f"Server returned status code {response.status_code}: {response.text}")
+        response_dict: dict = json.loads(response.text)
+        messages.append(dict(role="assistant", content=response_dict["content"]))
+        messages.append(dict(role="user", content=TEMPLATE_PROMPT_MULTIPLE_CHOICE_COT_2))
+
+        response = requests.post(
+            f"{server_address}/apply-template",
+            json=dict(messages=messages)
+        )
+        if response.status_code != 200:
+            raise RuntimeError(f"Server returned status code {response.status_code}: {response.text}")
+        prompt: str = json.loads(response.text)["prompt"]
+        prompt += TEMPLATE_RESPONSE_MULTIPLE_CHOICE_COT_2
+    else:
+        messages: List[str] = [
+            dict(role="user", content=TEMPLATE_PROMPT_MULTIPLE_CHOICE.format(question=question, choices_block=choices_block)),
+        ]
+        response = requests.post(
+            f"{server_address}/apply-template",
+            json=dict(messages=messages)
+        )
+        if response.status_code != 200:
+            raise RuntimeError(f"Server returned status code {response.status_code}: {response.text}")
+        prompt: str = json.loads(response.text)["prompt"]
+        prompt += TEMPLATE_RESPONSE_MULTIPLE_CHOICE
 
     response = requests.post(
         f"{server_address}/completion",
@@ -151,6 +198,7 @@ def process_model(model, gpu_id: int):
 
     popen_args: List[str] = [
         config["path_server"],
+        "--flash-attn",
         "--n-gpu-layers", "999",
         "--parallel", str(PARALLEL),
         "--ctx-size", str(PARALLEL * CTX_SIZE),
@@ -174,21 +222,27 @@ def process_model(model, gpu_id: int):
 
             assert ds_type == "multiple_choice"
 
-            data_modded = []
-            for ex in ds["data"]:
-                ex_copy = deepcopy(ex)
-                ex_copy["server_address"] = server_address
-                data_modded.append(ex_copy)
-
             os.makedirs(os.path.join(dir_out, ds_name), exist_ok=True)
 
-            print(f"Start: {name}-{quant}, {ds_name}, gpu_id={gpu_id}, server_address={server_address}")
-            with Pool(PARALLEL) as pool:
-                predictions = pool.map(process_example, data_modded, chunksize=10)
-            np.save(os.path.join(dir_out, ds_name, "predictions.npy"), predictions)
-
-            labels = np.array([ex["answer"] for ex in data_modded])
+            labels = np.array([ex["answer"] for ex in ds["data"]])
+            labels = labels[:1000]
             np.save(os.path.join(dir_out, ds_name, "labels.npy"), labels)
+
+            for cot in [False, True]:
+                data_modded = []
+                for ex in ds["data"]:
+                    ex_copy = deepcopy(ex)
+                    ex_copy["server_address"] = server_address
+                    ex_copy["cot"] = cot
+                    data_modded.append(ex_copy)
+                data_modded = data_modded[:1000]
+
+                print(f"Start: {name}-{quant}, {ds_name}, cot={cot}, gpu_id={gpu_id}, server_address={server_address}")
+                t0 = time()
+                with Pool(PARALLEL) as pool:
+                    predictions = pool.map(process_example, data_modded, chunksize=10)
+                print(f"Done: {name}-{quant}, {ds_name}, cot={cot}, time={time() - t0:.2f}s")
+                np.save(os.path.join(dir_out, ds_name, f"pred-cot{1 if cot else 0}.npy"), predictions)
 
         server_process.terminate()
 
