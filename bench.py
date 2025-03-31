@@ -23,6 +23,7 @@ for model in config["models"]:
     quantizations: List[str] = model.get("quantizations", config["quantizations"])
     path_model_template: str = model.get("path_model", config["path_model"])
     path_imatrix_template: str = model.get("path_imatrix", config["path_imatrix"])
+    skip_cot: bool = model.get("skip_cot", config["skip_cot"])
 
     for quant in quantizations:
         path_model: str = path_model_template.format(name=name, quantization=quant)
@@ -50,7 +51,7 @@ for model in config["models"]:
 
         file_size: int = os.path.getsize(path_model)
 
-        model_list.append(dict(name=name, quantization=quant, path_model=path_model, file_size=file_size))
+        model_list.append(dict(name=name, quantization=quant, path_model=path_model, file_size=file_size, skip_cot=skip_cot))
 
 model_list = sorted(model_list, key=lambda m: m["file_size"], reverse=True)
 
@@ -189,8 +190,24 @@ def process_model(model, gpu_id: int):
     name: str = model["name"]
     quant: str = model["quantization"]
     path_model: str = model["path_model"]
+    skip_cot: bool = model["skip_cot"]
+
     dir_out: str = os.path.join("out", "bench", name, quant)
     os.makedirs(dir_out, exist_ok=True)
+
+    all_targets_existent: bool = True
+    for ds in dataset_list:
+        ds_name = ds["name"]
+        for cot in [False, True]:
+            if skip_cot and cot:
+                continue
+
+            target: str = os.path.join(dir_out, ds_name, f"pred-cot{1 if cot else 0}.npy")
+            if not os.path.exists(target):
+                all_targets_existent = False
+                break
+    if all_targets_existent:
+        return
 
     env: Dict[str, str] = dict(
         CUDA_VISIBLE_DEVICES=str(gpu_id),
@@ -229,6 +246,13 @@ def process_model(model, gpu_id: int):
             np.save(os.path.join(dir_out, ds_name, "labels.npy"), labels)
 
             for cot in [False, True]:
+                if skip_cot and cot:
+                    continue
+
+                target: str = os.path.join(dir_out, ds_name, f"pred-cot{1 if cot else 0}.npy")
+                if os.path.exists(target):
+                    continue
+
                 data_modded = []
                 for ex in ds["data"]:
                     ex_copy = deepcopy(ex)
@@ -242,7 +266,7 @@ def process_model(model, gpu_id: int):
                 with Pool(PARALLEL) as pool:
                     predictions = pool.map(process_example, data_modded, chunksize=10)
                 print(f"Done: {name}-{quant}, {ds_name}, cot={cot}, time={time() - t0:.2f}s")
-                np.save(os.path.join(dir_out, ds_name, f"pred-cot{1 if cot else 0}.npy"), predictions)
+                np.save(target, predictions)
 
         server_process.terminate()
 
