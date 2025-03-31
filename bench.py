@@ -112,11 +112,9 @@ def process_multiple_choice(example: dict) -> List[float]:
     cot: bool = example["cot"]
     question: str = example["question"]
     choices: List[str] = example["choices"]
-    answer: int = example["answer"]
 
     assert type(question) is str
     assert type(choices) is list
-    assert type(answer) is int
 
     num_choices: int = len(choices)
     choices_block: str = get_choices_block(choices)
@@ -197,10 +195,8 @@ def process_math(example: dict) -> List[float]:
     server_address = example["server_address"]
     cot: bool = example["cot"]
     question: str = example["question"]
-    answer: int = example["answer"]
 
     assert type(question) is str
-    assert type(answer) is int
 
     messages: List[str] = [
         dict(role="user", content=question),
@@ -324,7 +320,12 @@ def process_model(model, gpu_id: int):
 
             os.makedirs(os.path.join(dir_out, ds_name), exist_ok=True)
 
-            labels = np.array([ex["answer"] for ex in ds["data"]])
+            if ds_type == "multiple_choice":
+                labels = np.array([ex["answer"] for ex in ds["data"]])
+            elif ds_type == "math":
+                labels = np.array([int(ex["answer"].split()[-1]) for ex in ds["data"]])
+            else:
+                assert False
             labels = labels[:1000]
             np.save(os.path.join(dir_out, ds_name, "labels.npy"), labels)
 
