@@ -323,7 +323,7 @@ def process_model(model, gpu_id: int):
             if ds_type == "multiple_choice":
                 labels = np.array([ex["answer"] for ex in ds["data"]])
             elif ds_type == "math":
-                labels = np.array([int(ex["answer"].split()[-1]) for ex in ds["data"]])
+                labels = np.array([int(ex["answer"].split()[-1].replace(",", "")) for ex in ds["data"]])
             else:
                 assert False
             labels = labels[:1000]
