@@ -95,6 +95,7 @@ dataset_list = []
 print("Loading MMLU...")
 mmlu = datasets.load_dataset("cais/mmlu", "all")
 dataset_list.append(dict(name="mmlu_test", type="multiple_choice", data=mmlu["test"]))
+dataset_list.append(dict(name="mmlu_val", type="multiple_choice", data=mmlu["validation"]))
 
 
 def process_example(example: dict) -> List[float]:
