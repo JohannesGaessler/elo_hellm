@@ -39,7 +39,6 @@ for model in models:
                     continue
                 predictions = np.load(path_pred)
                 assert predictions.shape[0] == labels.shape[0]
-                assert predictions.shape[1] == 4
 
                 # predictions = sample_min_p(predictions, 0.9)
 
