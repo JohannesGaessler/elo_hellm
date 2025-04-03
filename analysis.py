@@ -7,6 +7,9 @@ from iminuit import Minuit
 import numpy as np
 from scipy.stats import binom
 
+with open("config.yml") as f:
+    config: dict = yaml.safe_load(f)
+
 DIR_IN = os.path.join("out", "bench")
 DATASETS: List[str] = [
     "gsm8k_test",
@@ -15,7 +18,7 @@ DATASETS: List[str] = [
     "mmlu_train",
 ]
 
-models: List[str] = sorted(os.listdir(DIR_IN))
+models: config["models"]
 
 
 def sample_min_p(predictions: np.ndarray, min_p: float) -> np.ndarray:
@@ -79,6 +82,8 @@ for model in models:
                 continue
             labels = np.concatenate([labels, np.load(os.path.join(dir_in_mqd, "labels.npy"))])
         for cot in [False, True]:
+            if cot and config["skip_cot"]:
+                continue
             name: str = f"{model}-{quant}-cot{1 if cot else 0}"
             pred = np.zeros((0,))
             for dataset in DATASETS:
