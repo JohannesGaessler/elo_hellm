@@ -106,6 +106,12 @@ def get_winrate(elo_self: float, elo_other: float) -> float:
     return 1 / (1 + 10 ** ((elo_other - elo_self) / 400))
 
 
+def get_num_wins(pred, pred_other, labels):
+    num_draws: int = np.sum((pred == labels) == (pred_other == labels))
+    num_wins: int = num_draws // 2 + np.sum(np.logical_and(pred == labels, pred_other != labels))
+    return num_wins
+
+
 def get_nll(elos: np.ndarray) -> float:
     assert elos.ndim == 1
     assert elos.shape[0] == len(model_list) - 1
@@ -121,10 +127,7 @@ def get_nll(elos: np.ndarray) -> float:
             pred_i = model_list[i]["pred"]
             pred_j = model_list[j]["pred"]
 
-            num_wins: int = np.sum(np.logical_and(pred_i == labels, pred_j != labels))
-            num_draws: int = np.sum((pred_i == labels) == (pred_j == labels))
-
-            nll -= binom.logpmf(k=num_wins + num_draws // 2, n=labels.shape[0], p=get_winrate(elos[i], elos[j]))
+            nll -= binom.logpmf(k=get_num_wins(pred_i, pred_j, labels), n=labels.shape[0], p=get_winrate(elos[i], elos[j]))
     return nll
 
 
@@ -146,3 +149,14 @@ model_elo_unc = sorted(zip(model_list, final_elos, final_elos_unc), key=lambda m
 
 for model, elo, unc in model_elo_unc:
     print(f"{model['name']}: {elo:.2f}+-{unc:.2f}")
+
+print()
+
+for i in range(len(model_elo_unc)):
+    meui = model_elo_unc[i]
+    for j in range(i):
+        meuj = model_elo_unc[j]
+        wr_elo: float = get_winrate(meui[1], meuj[1])
+        num_wins: int = get_num_wins(meui[0]["pred"], meuj[0]["pred"], meui[0]["labels"])
+        wr_data: float = num_wins / meui[0]["labels"].shape[0]
+        print(f"{meui['name']} <-> {meuj['name']}: wr_elo={wr_elo:.2f} wr_data={wr_data:.2f}")
