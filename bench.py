@@ -98,12 +98,12 @@ dataset_list = []
 
 print("Loading MMLU...")
 mmlu = datasets.load_dataset("cais/mmlu", "all")
-dataset_list.append(dict(name="mmlu_val", type="multiple_choice", data=mmlu["validation"]))
+# dataset_list.append(dict(name="mmlu_val", type="multiple_choice", data=mmlu["validation"]))
 dataset_list.append(dict(name="mmlu_test", type="multiple_choice", data=mmlu["test"]))
 
 print("Loading GSM8K...")
 gsm8k = datasets.load_dataset("openai/gsm8k", "main")
-dataset_list.append(dict(name="gsm8k_train", type="math", data=gsm8k["train"]))
+# dataset_list.append(dict(name="gsm8k_train", type="math", data=gsm8k["train"]))
 dataset_list.append(dict(name="gsm8k_test", type="math", data=gsm8k["test"]))
 
 
