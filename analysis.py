@@ -142,5 +142,7 @@ final_elos = np.concatenate([final_elos, [1500 * len(model_list) - np.sum(final_
 final_elos_unc = np.array(m.errors)
 final_elos_unc = np.concatenate([final_elos_unc, [np.sqrt(np.sum(np.square(final_elos_unc)))]])
 
-for model, elo, unc in zip(model_list, final_elos, final_elos_unc):
+model_elo_unc = sorted(zip(model_list, final_elos, final_elos_unc), lambda meu: meu[1], reverse=True)
+
+for model, elo, unc in model_elo_unc:
     print(f"{model['name']}: {elo:.2f}+-{unc:.2f}")
