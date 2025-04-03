@@ -8,7 +8,12 @@ import numpy as np
 from scipy.stats import binom
 
 DIR_IN = os.path.join("out", "bench")
-DATASETS: List[str] = ["gsm8k_train", "gsm8k_test", "mmlu_test", "mmlu_train"]
+DATASETS: List[str] = [
+    "gsm8k_test",
+    "gsm8k_train",
+    "mmlu_test",
+    "mmlu_train",
+]
 
 models: List[str] = sorted(os.listdir(DIR_IN))
 
@@ -62,18 +67,26 @@ for model in models:
         print()
 
 
-assert False
-
 model_list = []
 for model in models:
     dir_in_m: str = os.path.join(DIR_IN, model)
     for quant in quantizations:
         dir_in_mq: str = os.path.join(dir_in_m, quant)
-        dir_in_mqd: str = os.path.join(dir_in_mq, "mmlu_test")
-        labels = np.load(os.path.join(dir_in_mqd, "labels.npy"))
+        labels = np.zeros((0,))
+        for dataset in DATASETS:
+            dir_in_mqd: str = os.path.join(dir_in_mq, dataset)
+            labels = np.concatenate([labels, np.load(os.path.join(dir_in_mqd, "labels.npy"))])
         for cot in [False, True]:
             name: str = f"{model}-{quant}-cot{1 if cot else 0}"
-            pred = np.load(os.path.join(dir_in_mqd, f"pred-cot{1 if cot else 0}.npy"))
+            pred = np.zeros((0,))
+            for dataset in DATASETS:
+                pred_part = np.load(os.path.join(dir_in_mqd, f"pred-cot{1 if cot else 0}.npy"))
+                if "mmlu" in dataset:
+                    pred = np.concatenate([pred, np.max(pred_part, axis=1)])
+                elif "gsm8k" in dataset:
+                    pred = np.concatenate([pred, pred_part])
+                else:
+                    assert False
             model_list.append(dict(name=name, labels=labels, pred=pred))
 
 
@@ -93,8 +106,8 @@ def get_nll(elos: np.ndarray) -> float:
             labels = model_list[i]["labels"]
             assert np.all(labels == model_list[j]["labels"])
 
-            pred_i = np.argmax(model_list[i]["pred"], axis=1)
-            pred_j = np.argmax(model_list[j]["pred"], axis=1)
+            pred_i = model_list[i]["pred"]
+            pred_j = model_list[j]["pred"]
 
             num_wins: int = np.sum(np.logical_and(pred_i == labels, pred_j != labels))
             num_draws: int = np.sum((pred_i == labels) == (pred_j == labels))
