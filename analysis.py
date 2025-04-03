@@ -20,7 +20,7 @@ DATASETS: List[str] = [
     "mmlu_train",
 ]
 
-models: List[str] = config["models"]
+models: List[str] = [m["name"] for m in config["models"]]
 
 
 def sample_min_p(predictions: np.ndarray, min_p: float) -> np.ndarray:
