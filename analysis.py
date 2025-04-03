@@ -75,11 +75,16 @@ for model in models:
         labels = np.zeros((0,))
         for dataset in DATASETS:
             dir_in_mqd: str = os.path.join(dir_in_mq, dataset)
+            if not os.path.exists(dir_in_mqd):
+                continue
             labels = np.concatenate([labels, np.load(os.path.join(dir_in_mqd, "labels.npy"))])
         for cot in [False, True]:
             name: str = f"{model}-{quant}-cot{1 if cot else 0}"
             pred = np.zeros((0,))
             for dataset in DATASETS:
+                dir_in_mqd: str = os.path.join(dir_in_mq, dataset)
+                if not os.path.exists(dir_in_mqd):
+                    continue
                 pred_part = np.load(os.path.join(dir_in_mqd, f"pred-cot{1 if cot else 0}.npy"))
                 if "mmlu" in dataset:
                     pred = np.concatenate([pred, np.max(pred_part, axis=1)])
