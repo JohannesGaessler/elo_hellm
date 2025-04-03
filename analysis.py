@@ -159,4 +159,4 @@ for i in range(len(model_elo_unc)):
         wr_elo: float = get_winrate(meui[1], meuj[1])
         num_wins: int = get_num_wins(meui[0]["pred"], meuj[0]["pred"], meui[0]["labels"])
         wr_data: float = num_wins / meui[0]["labels"].shape[0]
-        print(f"{meui[0]['name']} <-> {meuj[0]['name']}: wr_elo={wr_elo:.2f} wr_data={wr_data:.2f}")
+        print(f"{meui[0]['name']} <-> {meuj[0]['name']}: wr_elo={100*wr_elo:.2f}% wr_data={100*wr_data:.2f}%")
