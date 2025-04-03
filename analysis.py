@@ -6,6 +6,8 @@ from typing import List
 from iminuit import Minuit
 import numpy as np
 from scipy.stats import binom
+import yaml
+
 
 with open("config.yml") as f:
     config: dict = yaml.safe_load(f)
