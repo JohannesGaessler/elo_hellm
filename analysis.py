@@ -94,7 +94,7 @@ for model in models:
                     continue
                 pred_part = np.load(os.path.join(dir_in_mqd, f"pred-cot{1 if cot else 0}.npy"))
                 if "mmlu" in dataset:
-                    pred = np.concatenate([pred, np.max(pred_part, axis=1)])
+                    pred = np.concatenate([pred, np.argmax(pred_part, axis=1)])
                 elif "gsm8k" in dataset:
                     pred = np.concatenate([pred, pred_part])
                 else:
