@@ -14,9 +14,9 @@ models:
   - name: llama_3.2_instruct-3b
 quantizations:
   - f16
-  # - q8_0
-  # - q6_k
-  # - q5_k_m
-  # - q4_k_m
+  - q8_0
+  - q6_k
+  - q5_k_m
+  - q4_k_m
   - q3_k_m
-  # - q2_k
+  - q2_k

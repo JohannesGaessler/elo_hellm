@@ -331,7 +331,7 @@ def process_model(model, gpu_id: int):
                 labels = np.array([int(ex["answer"].split()[-1].replace(",", "")) for ex in ds["data"]])
             else:
                 assert False
-            labels = labels[:1000]
+            # labels = labels[:1000]
             np.save(os.path.join(dir_out, ds_name, "labels.npy"), labels)
 
             for cot in [False, True]:
@@ -348,7 +348,7 @@ def process_model(model, gpu_id: int):
                     ex_copy["server_address"] = server_address
                     ex_copy["cot"] = cot
                     data_modded.append(ex_copy)
-                data_modded = data_modded[:1000]
+                # data_modded = data_modded[:1000]
 
                 print(f"Start: {name}-{quant}, {ds_name}, cot={cot}, gpu_id={gpu_id}, server_address={server_address}")
                 t0 = time()
