@@ -4,6 +4,7 @@ import os
 from typing import List
 
 from iminuit import Minuit
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import binom
 import yaml
@@ -165,3 +166,15 @@ for i in range(len(model_elo_unc)):
             max_wr_diff = wr_diff
 
 print(max_wr_diff_info)
+
+file_sizes_gib: List[float] = [meu[0]["file_size_gib"] for meu in model_elo_unc]
+elos: List[float] = [meu[1] for meu in model_elo_unc]
+elos_unc: List[float] = [meu[2] for meu in model_elo_unc]
+
+plt.errorbar(file_sizes_gib, elos, elos_unc, linestyle="none")
+
+plt.title(", ".join(config["datasets"]))
+plt.xlabel("Model file size [GiB]")
+plt.ylabel("Elo score")
+
+plt.savefig("elo_vs_size.png", dpi=240)
