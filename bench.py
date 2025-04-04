@@ -292,7 +292,7 @@ def process_model(model, gpu_id: int):
     if all_targets_existent:
         return
 
-    with open(os.path.join(dir_out, "model.yml")) as f:
+    with open(os.path.join(dir_out, "model.yml"), "w") as f:
         yaml.safe_dump(model, f)
 
     env: Dict[str, str] = dict(
