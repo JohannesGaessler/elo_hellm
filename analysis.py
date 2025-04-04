@@ -70,6 +70,10 @@ for model in models:
     dir_in_m: str = os.path.join(DIR_IN, model)
     for quant in quantizations:
         dir_in_mq: str = os.path.join(dir_in_m, quant)
+        with open(os.path.join(dir_in_mq, "model.yml")) as f:
+            props: dict = yaml.safe_load(f)
+            file_size_gib: float = props["file_size"] / 1024 ** 3
+
         labels = np.zeros((0,))
         for dataset in config["datasets"]:
             dir_in_mqd: str = os.path.join(dir_in_mq, dataset)
@@ -92,7 +96,7 @@ for model in models:
                     pred = np.concatenate([pred, pred_part])
                 else:
                     assert False
-            model_list.append(dict(name=name, labels=labels, pred=pred))
+            model_list.append(dict(name=name, labels=labels, pred=pred, file_size_gib=file_size_gib))
 
 
 def get_winrate(elo_self: float, elo_other: float) -> float:
@@ -143,7 +147,7 @@ final_elos_unc = np.concatenate([final_elos_unc, [np.sqrt(np.sum(np.square(final
 model_elo_unc = sorted(zip(model_list, final_elos, final_elos_unc), key=lambda meu: meu[1], reverse=True)
 
 for model, elo, unc in model_elo_unc:
-    print(f"{model['name']}: {elo:.2f}+-{unc:.2f}")
+    print(f"{model['name']}: {elo:.2f}+-{unc:.2f} @ {model['file_size_gib']:.2f} GiB")
 
 print()
 
