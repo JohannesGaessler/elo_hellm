@@ -169,21 +169,22 @@ print(max_wr_diff_info)
 
 for model in models:
     for quant in quantizations:
-        name: str = f"{model}-{quant}"
-        print(name)
+        for cot in [False, True]:
+            name: str = f"{model}-{quant}-cot{1 if cot else 0}"
 
-        file_sizes_gib: List[float] = []
-        elos: List[float] = []
-        elos_unc: List[float] = []
-        for meu in model_elo_unc:
-            print(meu[0]["name"])
-            if meu[0]["name"] != name:
+            file_sizes_gib: List[float] = []
+            elos: List[float] = []
+            elos_unc: List[float] = []
+            for meu in model_elo_unc:
+                if meu[0]["name"] != name:
+                    continue
+                file_sizes_gib.append(meu[0]["file_size_gib"])
+                elos.append(meu[1])
+                elos_unc.append(meu[2])
+            if not file_sizes_gib:
                 continue
-            file_sizes_gib.append(meu[0]["file_size_gib"])
-            elos.append(meu[1])
-            elos_unc.append(meu[2])
 
-        plt.errorbar(file_sizes_gib, elos, elos_unc, marker="o", linestyle="none", label=name)
+            plt.errorbar(file_sizes_gib, elos, elos_unc, marker="o", linestyle="none", label=name)
 
 plt.title(", ".join(config["datasets"]))
 plt.xlabel("Model file size [GiB]")
