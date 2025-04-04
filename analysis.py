@@ -15,9 +15,9 @@ with open("config.yml") as f:
 DIR_IN = os.path.join("out", "bench")
 DATASETS: List[str] = [
     "gsm8k_test",
-    "gsm8k_train",
+    # "gsm8k_train",
     "mmlu_test",
-    "mmlu_train",
+    # "mmlu_train",
 ]
 
 models: List[str] = [m["name"] for m in config["models"]]
@@ -132,12 +132,14 @@ def get_nll(elos: np.ndarray) -> float:
 
 
 starting_elos = 1500 * np.ones(len(model_list) - 1)
-print(get_nll(starting_elos))
+print(f"Pre-fit cost: {get_nll(starting_elos)}")
 
 m = Minuit(get_nll, starting_elos)
 m.errordef = 0.5
 m.migrad()
 m.hesse()
+
+print(f"Post-fit cost: {m.fval}")
 
 final_elos = np.array(m.values)
 final_elos = np.concatenate([final_elos, [1500 * len(model_list) - np.sum(final_elos)]])
