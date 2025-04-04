@@ -188,6 +188,7 @@ for model in models:
 plt.title(", ".join(config["datasets"]))
 plt.xlabel("Model file size [GiB]")
 plt.ylabel("Elo score")
+plt.xscale("log")
 plt.legend()
 
 plt.savefig("elo_vs_size.png", dpi=240)
