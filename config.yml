@@ -3,17 +3,20 @@ path_quantize: /home/johannesg/Projects/llama.cpp/build/bin/llama-quantize
 path_model: /opt/models/{name}-{quantization}.gguf
 path_imatrix: /opt/models/{name}.imatrix
 
+datasets:
+  - gsm8k_test
+  - mmlu_test
 skip_cot: True
-quantizations:
-  - f16
-  - q8_0
-  - q6_k
-  - q5_k_m
-  - q4_k_m
-  - q3_k_m
-  - q2_k
 
 models:
   - name: llama_3.1_instruct-8b
   - name: llama_3.2_instruct-1b
   - name: llama_3.2_instruct-3b
+quantizations:
+  - f16
+  # - q8_0
+  # - q6_k
+  # - q5_k_m
+  # - q4_k_m
+  - q3_k_m
+  # - q2_k

@@ -13,13 +13,6 @@ with open("config.yml") as f:
     config: dict = yaml.safe_load(f)
 
 DIR_IN = os.path.join("out", "bench")
-DATASETS: List[str] = [
-    "gsm8k_test",
-    # "gsm8k_train",
-    "mmlu_test",
-    # "mmlu_train",
-]
-
 models: List[str] = [m["name"] for m in config["models"]]
 
 
@@ -38,7 +31,7 @@ for model in models:
     for quant in quantizations:
         dir_in_mq: str = os.path.join(dir_in_m, quant)
         print(f"====== {model}-{quant} ======")
-        for dataset in DATASETS:
+        for dataset in config["datasets"]:
             dir_in_mqd: str = os.path.join(dir_in_mq, dataset)
             if not os.path.exists(dir_in_mqd):
                 continue
@@ -78,7 +71,7 @@ for model in models:
     for quant in quantizations:
         dir_in_mq: str = os.path.join(dir_in_m, quant)
         labels = np.zeros((0,))
-        for dataset in DATASETS:
+        for dataset in config["datasets"]:
             dir_in_mqd: str = os.path.join(dir_in_mq, dataset)
             if not os.path.exists(dir_in_mqd):
                 continue
@@ -88,7 +81,7 @@ for model in models:
                 continue
             name: str = f"{model}-{quant}-cot{1 if cot else 0}"
             pred = np.zeros((0,))
-            for dataset in DATASETS:
+            for dataset in config["datasets"]:
                 dir_in_mqd: str = os.path.join(dir_in_mq, dataset)
                 if not os.path.exists(dir_in_mqd):
                     continue
@@ -132,14 +125,14 @@ def get_nll(elos: np.ndarray) -> float:
 
 
 starting_elos = 1500 * np.ones(len(model_list) - 1)
-print(f"Pre-fit cost: {get_nll(starting_elos)}")
+print(f"Pre-fit cost: {get_nll(starting_elos):.2f}")
 
 m = Minuit(get_nll, starting_elos)
 m.errordef = 0.5
 m.migrad()
 m.hesse()
 
-print(f"Post-fit cost: {m.fval}")
+print(f"Post-fit cost: {m.fval:.2f}")
 
 final_elos = np.array(m.values)
 final_elos = np.concatenate([final_elos, [1500 * len(model_list) - np.sum(final_elos)]])
@@ -154,7 +147,7 @@ for model, elo, unc in model_elo_unc:
 
 print()
 
-max_wr_diff: float  = 0.0
+max_wr_diff: float = 0.0
 for i in range(len(model_elo_unc)):
     meui = model_elo_unc[i]
     for j in range(i):

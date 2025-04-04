@@ -96,15 +96,17 @@ TEMPLATE_GRAMMAR_MATH = "root ::= [0-9]+.*"
 
 dataset_list = []
 
-print("Loading MMLU...")
-mmlu = datasets.load_dataset("cais/mmlu", "all")
-# dataset_list.append(dict(name="mmlu_val", type="multiple_choice", data=mmlu["validation"]))
-dataset_list.append(dict(name="mmlu_test", type="multiple_choice", data=mmlu["test"]))
+if "mmlu_test" in config["datasets"]:
+    print("Loading MMLU...")
+    mmlu = datasets.load_dataset("cais/mmlu", "all")
+    # dataset_list.append(dict(name="mmlu_val", type="multiple_choice", data=mmlu["validation"]))
+    dataset_list.append(dict(name="mmlu_test", type="multiple_choice", data=mmlu["test"]))
 
-print("Loading GSM8K...")
-gsm8k = datasets.load_dataset("openai/gsm8k", "main")
-# dataset_list.append(dict(name="gsm8k_train", type="math", data=gsm8k["train"]))
-dataset_list.append(dict(name="gsm8k_test", type="math", data=gsm8k["test"]))
+if "gsm8k_test" in config["datasets"]:
+    print("Loading GSM8K...")
+    gsm8k = datasets.load_dataset("openai/gsm8k", "main")
+    # dataset_list.append(dict(name="gsm8k_train", type="math", data=gsm8k["train"]))
+    dataset_list.append(dict(name="gsm8k_test", type="math", data=gsm8k["test"]))
 
 
 def process_multiple_choice(example: dict) -> List[float]:
@@ -289,6 +291,9 @@ def process_model(model, gpu_id: int):
                 break
     if all_targets_existent:
         return
+
+    with open(os.path.join(dir_out, "model.yml")) as f:
+        yaml.safe_dump(model, f)
 
     env: Dict[str, str] = dict(
         CUDA_VISIBLE_DEVICES=str(gpu_id),
