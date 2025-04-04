@@ -152,6 +152,7 @@ for model, elo, unc in model_elo_unc:
 
 print()
 
+max_wr_diff: float  = 0.0
 for i in range(len(model_elo_unc)):
     meui = model_elo_unc[i]
     for j in range(i):
@@ -159,4 +160,9 @@ for i in range(len(model_elo_unc)):
         wr_elo: float = get_winrate(meui[1], meuj[1])
         num_wins: int = get_num_wins(meui[0]["pred"], meuj[0]["pred"], meui[0]["labels"])
         wr_data: float = num_wins / meui[0]["labels"].shape[0]
-        print(f"{meui[0]['name']} <-> {meuj[0]['name']}: wr_elo={100*wr_elo:.2f}% wr_data={100*wr_data:.2f}%")
+        wr_diff: float = np.abs(wr_elo - wr_data)
+        if wr_diff > max_wr_diff:
+            max_wr_diff_info = f"{meui[0]['name']} <-> {meuj[0]['name']}: wr_elo={100*wr_elo:.2f}% wr_data={100*wr_data:.2f}%"
+            max_wr_diff = wr_diff
+
+print(max_wr_diff_info)
