@@ -170,11 +170,13 @@ print(max_wr_diff_info)
 for model in models:
     for quant in quantizations:
         name: str = f"{model}-{quant}"
+        print(name)
 
         file_sizes_gib: List[float] = []
         elos: List[float] = []
         elos_unc: List[float] = []
         for meu in model_elo_unc:
+            print(meu[0]["name"])
             if meu[0]["name"] != name:
                 continue
             file_sizes_gib.append(meu[0]["file_size_gib"])
