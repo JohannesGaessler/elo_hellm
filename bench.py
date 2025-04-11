@@ -289,7 +289,7 @@ def process_model(model, gpu_ids: List[int]):
         yaml.safe_dump(model, f)
 
     env: Dict[str, str] = dict(
-        CUDA_VISIBLE_DEVICES=",".join(gpu_ids),
+        CUDA_VISIBLE_DEVICES=",".join([str(g) for g in gpu_ids]),
     )
 
     popen_args: List[str] = [
