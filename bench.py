@@ -282,8 +282,8 @@ def process_job(job, gpu_ids: List[int]):
     if os.path.exists(target):
         return
 
-    with open(os.path.join(dir_out, "job.yml"), "w") as f:
-        yaml.safe_dump(job, f)
+    # with open(os.path.join(dir_out, "job.yml"), "w") as f:
+    #     yaml.safe_dump(job, f)
 
     if dataset["type"] == "multiple_choice":
         labels = np.array([ex["answer"] for ex in dataset["data"]], dtype=np.int64)
