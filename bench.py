@@ -346,7 +346,7 @@ def process_model(model, gpu_ids: List[int]):
                 print(f"Start: {name}-{quant}, {ds_name}, {prompt_type}, gpu_ids={gpu_ids}")
                 t0 = time()
                 with Pool(parallel) as pool:
-                    chunksize: int = 1 if config["debug"] else min(10, len(data_modded) // parallel)
+                    chunksize: int = 1 if config["debug"] else min(10, max(1, len(data_modded) // parallel))
                     if ds_type == "multiple_choice":
                         predictions = pool.map(process_multiple_choice, data_modded, chunksize=chunksize)
                         predictions = np.array(predictions, dtype=np.float64)
