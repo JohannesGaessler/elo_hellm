@@ -382,21 +382,33 @@ def process_models(gpu_ids: List[int]):
         model = find_model(len(gpu_ids))
 
 
-NUM_GPUS: int = 1 if config["debug"] else 6
-gpu_ids_main: List[int] = list(range(NUM_GPUS))
-threads = []
+gpu_ids: List[int] = list(range(6))
+threads_2 = []
 
-while len(gpu_ids_main) > 1:
-    process_models(gpu_ids_main)
+process_models(gpu_ids)
+process_models(gpu_ids[:5])
 
-    gpu_ids_thread = gpu_ids_main[-1:]
-    gpu_ids_main = gpu_ids_main[:-1]
+threads_2.append(threading.Thread(target=process_models, args=[gpu_ids[4:]]))
+threads_2[-1].start()
+process_models(gpu_ids[:4])
 
-    t = threading.Thread(target=process_models, args=[gpu_ids_thread])
-    t.start()
-    threads.append(t)
+threads_2.append(threading.Thread(target=process_models, args=[gpu_ids[2:4]]))
+threads_2[-1].start()
+process_models(gpu_ids[:2])
 
-process_models(gpu_ids_main)
+for thread in threads_2:
+    thread.join()
 
-for thread in threads:
+thread_3 = threading.Thread(target=process_models, args=[gpu_ids[3:]])
+thread_3.start()
+process_models(gpu_ids[:3])
+thread_3.join()
+
+threads_1 = []
+for i in range(1, 6):
+    threads_1.append(threading.Thread(target=process_models, args=[gpu_ids[i:i+1]]))
+    threads_1[-1].start()
+process_models(gpu_ids[:1])
+
+for thread in threads_1:
     thread.join()
