@@ -61,5 +61,5 @@ models:
   - name: phi_4_mini_instruct-4b
   - name: qwen_2.5_instruct_1m-7b
   - name: qwq-32b
-    gpus_per_job: 3
+    gpus_per_job: 4
   - name: stablelm_2_chat-2b
