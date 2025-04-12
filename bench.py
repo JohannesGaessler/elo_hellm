@@ -2,16 +2,16 @@
 
 from copy import deepcopy
 import json
-from multiprocessing import Pool
 import os
+import random
 from time import sleep, time
-import threading
 from typing import Dict, List
 
 import datasets
 import numpy as np
 import requests
 import subprocess
+from tqdm.contrib.concurrent import process_map
 import yaml
 
 
@@ -64,11 +64,11 @@ for model in config["models"]:
             prompt_types=prompt_types,
         ))
 
-model_list = sorted(model_list, key=lambda m: m["file_size"], reverse=True)
+model_list = sorted(model_list, key=lambda m: m["file_size"], reverse=False)
 
 CTX_SIZE = 4096
 
-LETTERS = ["a", "b", "c", "d", "e", "f", "g", "h", "i"]
+LETTERS = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"]
 
 TEMPLATE_SERVER_ADDRESS = "http://localhost:{port}"
 TEMPLATE_PROMPT_MULTIPLE_CHOICE = """{question}
@@ -106,6 +106,42 @@ if "gsm8k_test" in config["datasets"]:
     gsm8k = datasets.load_dataset("openai/gsm8k", "main")
     # dataset_list.append(dict(name="gsm8k_train", type="math", data=gsm8k["train"]))
     dataset_list.append(dict(name="gsm8k_test", type="math", data=gsm8k["test"]))
+
+if "gpqa_main" in config["datasets"]:
+    print("Loading GPQA...")
+    random.seed(123456)
+    gpqa_raw = datasets.load_dataset("Idavidrein/gpqa", "gpqa_main")["train"]
+    data = []
+    for ex in gpqa_raw:
+        if ex["Extra Revised Question"] is not None:
+            question = ex["Extra Revised Question"]
+            choice_correct = ex["Extra Revised Correct Answer"]
+            choices_wrong = [
+                ex["Extra Revised Incorrect Answer 1"],
+                ex["Extra Revised Incorrect Answer 2"],
+                ex["Extra Revised Incorrect Answer 3"],
+            ]
+        else:
+            question = ex["Question"]
+            choice_correct = ex["Correct Answer"]
+            choices_wrong = [
+                ex["Incorrect Answer 1"],
+                ex["Incorrect Answer 2"],
+                ex["Incorrect Answer 3"],
+            ]
+        choices = [choice_correct] + choices_wrong
+        random.shuffle(choices)
+        answer = choices.index(choice_correct)
+
+        data.append(dict(question=question, choices=choices, answer=answer))
+    dataset_list.append(dict(name="gpqa_main", type="multiple_choice", data=data))
+
+if "mmlu-pro_test" in config["datasets"]:
+    print("Loading MMLU-Pro...")
+    mmlu_pro_raw = datasets.load_dataset("TIGER-Lab/MMLU-Pro")["test"]
+    data = [dict(question=ex["question"], choices=ex["options"], answer=ex["answer_index"]) for ex in mmlu_pro_raw]
+    data = list(filter(lambda d: len(d["choices"]) == 10, data))
+    dataset_list.append(dict(name="mmlu-pro_test", type="multiple_choice", data=data))
 
 
 def process_multiple_choice(example: dict) -> List[float]:
@@ -359,16 +395,16 @@ def process_model(model):
 
             t0 = time()
             print(f"Start: {name}-{quant}, {ds_name}, {prompt_type}")
-            with Pool(2 * len(servers) * parallel) as pool:
-                chunksize: int = 1
-                if ds_type == "multiple_choice":
-                    predictions = pool.map(process_multiple_choice, data_modded, chunksize=chunksize)
-                    predictions = np.array(predictions, dtype=np.float64)
-                elif ds_type == "math":
-                    predictions = pool.map(process_math, data_modded, chunksize=chunksize)
-                    predictions = np.array(predictions, dtype=np.int64)
-                else:
-                    assert False
+            max_workers: int = 2 * len(servers) * parallel
+            chunksize: int = 1
+            if ds_type == "multiple_choice":
+                predictions = process_map(process_multiple_choice, data_modded, max_workers=max_workers, chunksize=chunksize)
+                predictions = np.array(predictions, dtype=np.float64)
+            elif ds_type == "math":
+                predictions = process_map(process_math, data_modded, max_workers=max_workers, chunksize=chunksize)
+                predictions = np.array(predictions, dtype=np.int64)
+            else:
+                assert False
             print(f"Done: {name}-{quant}, {ds_name}, {prompt_type}, time={time() - t0:.2f}s")
             np.save(target, predictions)
 
@@ -376,6 +412,8 @@ def process_model(model):
         server["process"].terminate()
         server["fout"].close()
         server["ferr"].close()
+    for server in servers:
+        server["process"].wait()
 
 
 for model in model_list:

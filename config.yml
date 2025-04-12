@@ -7,8 +7,10 @@ path_model: /opt/models/{name}-{quantization}.gguf
 path_imatrix: /opt/models/{name}.imatrix
 
 datasets:
+  - gpqa_main
   - gsm8k_test
   - mmlu_test
+  - mmlu-pro_test
 prompt_types:
   - instant
   - normal
@@ -45,8 +47,8 @@ models:
     parallel: 2
   - name: gemma_3_it-1b
   - name: gemma_3_it-4b
-  - name: gemma_3_it-12b
-    gpus_per_job: 2
+  # - name: gemma_3_it-12b
+  #   gpus_per_job: 2
   - name: glm_4_chat-9b
   - name: llama_3.1_instruct-8b
   - name: llama_3.2_instruct-1b
