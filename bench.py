@@ -216,8 +216,9 @@ def process_multiple_choice(example: dict) -> List[float]:
         predictions[index_token] = token_info["prob"]
     if config["debug"]:
         print(f"====== {name} ======")
-        print(prompt)
-        print(f"predictions={predictions}")
+        print(f"index={example['index']}")
+        print(f"server={server_address}")
+        print(f"prompt={prompt}")
         print()
     return predictions
 
@@ -291,7 +292,9 @@ def process_math(example: dict) -> List[float]:
             break
     if prediction == 123456789 or config["debug"]:
         print(f"====== {name} ======")
-        print(prompt)
+        print(f"index={example['index']}")
+        print(f"server={server_address}")
+        print(f"prompt={prompt}")
         print(f"prediction={content} -> {prediction}")
         print()
     return prediction
@@ -388,6 +391,7 @@ def process_model(model):
             data_modded = []
             for i, ex_i in enumerate(ds_data):
                 ex_copy = deepcopy(ex_i)
+                ex_copy["index"] = i
                 ex_copy["name"] = f"{name}-{quant}-{ds_name}-{prompt_type}"
                 ex_copy["server_address"] = servers[i % len(servers)]["address"]
                 ex_copy["prompt_type"] = prompt_type
