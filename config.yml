@@ -53,6 +53,9 @@ models:
   - name: llama_3.1_instruct-8b
   - name: llama_3.2_instruct-1b
   - name: llama_3.2_instruct-3b
+  - name: llama_4_scout_17b_16e_instruct-108b
+    quantizations: [q3_k_h]
+    gpus_per_job: 3
   - name: ministral_instruct_2410-8b
   - name: mistral_nemo_instruct_2407-12b
     gpus_per_job: 2
