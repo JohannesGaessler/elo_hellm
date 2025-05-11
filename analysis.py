@@ -63,6 +63,8 @@ for model, quantizations, prompt_types in models:
         if all_files_existent:
             model_list.append(dict(name=f"{model}-{quant}", labels=labels, pred=pred, file_size_gib=file_size_gib))
 
+ncorrect_total = 0
+ntest_total = 0
 model_scores = []
 for dataset in config["datasets"]:
     for prompt_type in config["prompt_types"]:
@@ -97,6 +99,9 @@ for dataset in config["datasets"]:
                     pareto_frontier = False
                     break
             r1.append(pareto_frontier)
+        ncorrect_total += np.sum(ncorrect)
+        ntest_total += ncorrect.shape[0] * ntest
+
         plt.figure()
         file_sizes_gib = np.array([r[1] for r in rows if r[4]])
         win_rates = np.array([r[3] for r in rows if r[4]])
@@ -127,6 +132,8 @@ for dataset in config["datasets"]:
         print()
 
         model_scores.append(dict(name=name, ncorrect=ncorrect, ntest=ntest, floor=floor))
+print(f"Total correct answers: {ncorrect_total}/{ntest_total}")
+print()
 
 
 def decompile_pars(pars, cov_mat=None):
