@@ -1,96 +1,54 @@
 #!/usr/bin/env python3
 
 import os
-from typing import List
 
 from adjustText import adjust_text
 from iminuit import Minuit
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.stats import binom, chi2
+from scipy.stats import chi2
 from tabulate import tabulate
-import yaml
 
+from elo_hellm.benchmark import get_benchmark
+from elo_hellm.config import Config
+
+
+config = Config("config.yml")
 
 plt.rcParams["figure.figsize"] = (14, 11)
 plt.subplots_adjust(left=0.05, bottom=0.05, right=0.95, top=0.95)
 
-with open("config.yml") as f:
-    config: dict = yaml.safe_load(f)
-
-DIR_IN = os.path.join("out", "bench")
 DIR_OUT = os.path.join("out", "analysis")
 os.makedirs(DIR_OUT, exist_ok=True)
 
-models: List[str] = [
-    (m["name"], m.get("quantizations", config["quantizations"]), m.get("prompt_types", config["prompt_types"]))
-    for m in config["models"]
-]
-
-model_list = []
-for model, quantizations, prompt_types in models:
-    dir_in_m: str = os.path.join(DIR_IN, model)
-    for quant in quantizations:
-        dir_in_mq: str = os.path.join(dir_in_m, quant)
-        path_meta: str = os.path.join(dir_in_mq, "model.yml")
-        if not os.path.exists(path_meta):
-            continue
-        with open(path_meta) as f:
-            props: dict = yaml.safe_load(f)
-            file_size_gib: float = props["file_size"] / 1024 ** 3
-
-        all_files_existent: bool = True
-        labels = dict()
-        for dataset in config["datasets"]:
-            dir_in_mqd: str = os.path.join(dir_in_mq, dataset)
-            path_labels: str = os.path.join(dir_in_mqd, "labels.npy")
-            if not os.path.exists(path_labels):
-                all_files_existent = False
-                break
-            labels[dataset] = np.load(path_labels)
-        pred = dict()
-        for prompt_type in prompt_types:
-            for dataset in config["datasets"]:
-                name: str = f"{dataset}-{prompt_type}"
-                dir_in_mqd: str = os.path.join(dir_in_mq, dataset)
-                path_pred: str = os.path.join(dir_in_mqd, f"pred-{prompt_type}.npy")
-                if not os.path.exists(path_pred):
-                    all_files_existent = False
-                    break
-                pred[name] = np.load(path_pred)
-                if dataset in ["mmlu_test", "gpqa_main", "mmlu-pro_test"]:
-                    pred[name] = np.argmax(pred[name], axis=1)
-        if all_files_existent:
-            model_list.append(dict(name=f"{model}-{quant}", labels=labels, pred=pred, file_size_gib=file_size_gib))
+results: dict[tuple[str, str], dict] = dict()
+for model in config.models:
+    for dataset in model.datasets:
+        for prompt_type in model.prompt_types:
+            benchmark = get_benchmark(dataset, prompt_type)
+            results[(model.name, benchmark.database_name())] = np.array(benchmark.get_results(model.name), dtype=np.int64)
 
 ncorrect_total = 0
 ntest_total = 0
 model_scores = []
-for dataset in config["datasets"]:
-    for prompt_type in config["prompt_types"]:
-        name: str = f"{dataset}-{prompt_type}"
+for dataset in config.datasets:
+    for prompt_type in config.prompt_types:
+        benchmark = get_benchmark(dataset, prompt_type)
+        name: str = benchmark.database_name()
         print(f"## {name}")
         print()
 
-        if dataset in ["mmlu_test", "gpqa_main"]:
-            floor: float = 0.25
-        elif dataset == "gsm8k_test":
-            floor: float = 0.00
-        elif dataset == "mmlu-pro_test":
-            floor: float = 0.10
-        else:
-            assert False
-
-        rows: list = []
-        ncorrect = np.zeros(len(model_list), dtype=np.int64)
+        rows: list[list] = []
+        ncorrect = np.zeros(len(config.models), dtype=np.int64)
         ntest = None
-        for i, model_i in enumerate(model_list):
+        for i, model_i in enumerate(config.models):
+            labels, pred = results[(model_i.name, name)]
             if ntest is None:
-                ntest = model_i["labels"][dataset].shape[0]
+                ntest = labels.shape[0]
             else:
-                assert model_i["labels"][dataset].shape[0] == ntest
-            ncorrect[i] = np.sum(model_i["pred"][name] == model_i["labels"][dataset])
-            rows.append([model_i["name"], model_i["file_size_gib"], f"{ncorrect[i]}/{ntest}", ncorrect[i]/ntest])
+                assert labels.shape[0] == ntest
+            ncorrect[i] = np.sum(pred == labels)
+            rows.append([model_i.name, model_i.file_size / 1024 ** 3, f"{ncorrect[i]}/{ntest}", ncorrect[i]/ntest])
         rows = sorted(rows, key=lambda r: r[1], reverse=True)
         for r1 in rows:
             pareto_frontier: bool = True
@@ -111,8 +69,8 @@ for dataset in config["datasets"]:
         win_rates = np.array([r[3] for r in rows if not r[4]])
         win_rates_unc = np.sqrt(win_rates * (1.0 - win_rates) / ntest)
         plt.errorbar(file_sizes_gib, win_rates, win_rates_unc, marker=".", linestyle="none")
-        if floor != 0.0:
-            plt.hlines(floor, 0, 50, colors="black", linestyles=":")
+        if benchmark.score_rng != 0.0:
+            plt.hlines(benchmark.score_rng, 0, 50, colors="black", linestyles=":")
         texts = [plt.text(r[1], r[3], r[0]) for r in rows]
         plt.xlim(0, 50)
         plt.ylim(0, 1)
@@ -131,7 +89,7 @@ for dataset in config["datasets"]:
         print(tabulate(rows, headers=["Model", "File size [GiB]", "Correct answers", "", "Pareto frontier?"], tablefmt="github"))
         print()
 
-        model_scores.append(dict(name=name, ncorrect=ncorrect, ntest=ntest, floor=floor))
+        model_scores.append(dict(name=name, ncorrect=ncorrect, ntest=ntest, floor=benchmark.score_rng))
 print(f"Total correct answers: {ncorrect_total}/{ntest_total}")
 print()
 
@@ -139,7 +97,7 @@ print()
 def decompile_pars(pars, cov_mat=None):
     pars = np.asarray(pars)
     assert pars.ndim == 1
-    assert pars.shape[0] == 2 * len(model_scores) + len(model_list) - 2
+    assert pars.shape[0] == 2 * len(model_scores) + len(config.models) - 2
     scales = pars[:len(model_scores)-1]
     elos_datasets = pars[len(model_scores)-1:2*len(model_scores)-1]
     elos_models = pars[2*len(model_scores)-1:]
@@ -177,7 +135,7 @@ def get_nll(pars: np.ndarray, wr_err: float) -> float:
 
 
 starting_scales = 400 * np.ones(len(model_scores) - 1)
-starting_elos = 1500 * np.ones(len(model_scores) + len(model_list) - 1)
+starting_elos = 1500 * np.ones(len(model_scores) + len(config.models) - 1)
 starting_pars = np.concatenate([starting_scales, starting_elos])
 print(f"Pre-fit cost: {get_nll(starting_pars, 0.0):.2f}")
 
@@ -254,14 +212,14 @@ dataset_elo_scale_unc = sorted(
     key=lambda mesu: mesu[1], reverse=True
 )
 model_elo_unc = sorted(
-    zip(model_list, final_elos_models, final_elos_models_unc),
+    zip(config.models, final_elos_models, final_elos_models_unc),
     key=lambda meu: meu[1], reverse=True
 )
 
 rows = []
 for dataset, elo, scale, elo_unc, scale_unc in dataset_elo_scale_unc:
     rows.append([dataset["name"], f"{elo:.2f}±{elo_unc:.2f}", f"{scale:.2f}±{scale_unc:.2f}"])
-print(f"## Final Dataset Elo Scores")
+print("## Final Dataset Elo Scores")
 print()
 print(tabulate(rows, headers=["Dataset", "Elo score", "Scale"], tablefmt="github"))
 print()
@@ -270,11 +228,11 @@ rows = []
 for model, elo, unc in model_elo_unc:
     pareto_frontier: bool = True
     for model2, elo2, _ in model_elo_unc:
-        if model2["file_size_gib"] < model["file_size_gib"] and elo2 > elo:
+        if model2.file_size < model.file_size and elo2 > elo:
             pareto_frontier = False
             break
-    rows.append([model["name"], f"{model['file_size_gib']:.2f}", f"{elo:.2f}±{unc:.2f}", "Yes" if pareto_frontier else "No"])
-print(f"## Final Model Elo Scores")
+    rows.append([model.name, f"{model.file_size/1024**3:.2f}", f"{elo:.2f}±{unc:.2f}", "Yes" if pareto_frontier else "No"])
+print("## Final Model Elo Scores")
 print()
 print(tabulate(rows, headers=["Model", "File Size [GiB]", "Elo score", "Pareto Frontier?"], tablefmt="github"))
 print()
@@ -295,7 +253,7 @@ for i, ms_i in enumerate(model_scores):
             num_within_sigma[2] += 1
         num_total += 1
         if abs_diff_j > wr_data_unc[j]:
-            print(f"dataset={ms_i['name']} model={model_list[j]['name']}: wr_elo={100*wr_elo[j]:.4f}% wr_data={100*wr_data[j]:.4f}%")
+            print(f"dataset={ms_i['name']} model={config.models[j].name}: wr_elo={100*wr_elo[j]:.4f}% wr_data={100*wr_data[j]:.4f}%")
 print(f"Within 1 sigma: {100*num_within_sigma[0]/num_total:.2f}%")
 print(f"Within 2 sigma: {100*num_within_sigma[1]/num_total:.2f}%")
 print(f"Within 3 sigma: {100*num_within_sigma[2]/num_total:.2f}%")
@@ -313,7 +271,7 @@ for fed, fs, ms in zip(final_elos_datasets, final_scales, model_scores):
     plt.errorbar(final_elos_models, wr_data, wr_data_unc, marker=".", linestyle="none")
     if ms["floor"] != 0.0:
         plt.hlines(ms["floor"], x_plot[0], x_plot[-1], colors="black", linestyles=":")
-    texts = [plt.text(fem, wrd, m["name"]) for fem, wrd, m in zip(final_elos_models, wr_data, model_list)]
+    texts = [plt.text(fem, wrd, m.name) for fem, wrd, m in zip(final_elos_models, wr_data, config.models)]
     plt.xlim(x_plot[0], x_plot[-1])
     plt.ylim(0, 1)
     adjust_text(texts, final_elos_models, wr_data,
@@ -326,34 +284,34 @@ for fed, fs, ms in zip(final_elos_datasets, final_scales, model_scores):
     plt.savefig(os.path.join(DIR_OUT, f"{ms['name']}-elo-winrate.png"), dpi=240)
 
 plot_data = []
-for i, model_i in enumerate(model_list):
+for i, model_i in enumerate(config.models):
     plot_data.append(dict(model=model_i, elo=final_elos_models[i], elo_unc=final_elos_models_unc[i]))
 for pd1 in plot_data:
     pareto_frontier = True
     for pd2 in plot_data:
-        if pd2["elo"] > pd1["elo"] and pd2["model"]["file_size_gib"] < pd1["model"]["file_size_gib"]:
+        if pd2["elo"] > pd1["elo"] and pd2["model"].file_size < pd1["model"].file_size:
             pareto_frontier = False
             break
     pd1["pareto_frontier"] = pareto_frontier
-plot_data = sorted(plot_data, key=lambda pd: pd["model"]["file_size_gib"])
+plot_data = sorted(plot_data, key=lambda pd: pd["model"].file_size)
 
 plt.figure()
 plt.errorbar(
-    [pd["model"]["file_size_gib"] for pd in plot_data if pd["pareto_frontier"]],
+    [pd["model"].file_size/1024**3 for pd in plot_data if pd["pareto_frontier"]],
     [pd["elo"] for pd in plot_data if pd["pareto_frontier"]],
     [pd["elo_unc"] for pd in plot_data if pd["pareto_frontier"]],
     marker=".",
 )
 plt.errorbar(
-    [pd["model"]["file_size_gib"] for pd in plot_data if not pd["pareto_frontier"]],
+    [pd["model"].file_size/1024**3 for pd in plot_data if not pd["pareto_frontier"]],
     [pd["elo"] for pd in plot_data if not pd["pareto_frontier"]],
     [pd["elo_unc"] for pd in plot_data if not pd["pareto_frontier"]],
     marker=".",
     linestyle="none"
 )
 for pd in plot_data:
-    texts = [plt.text(pd["model"]["file_size_gib"], pd["elo"], pd["model"]["name"]) for pd in plot_data]
-    adjust_text(texts, [pd["model"]["file_size_gib"] for pd in plot_data], [pd["elo"] for pd in plot_data],
+    texts = [plt.text(pd["model"].file_size/1024**3, pd["elo"], pd["model"].name) for pd in plot_data]
+    adjust_text(texts, [pd["model"].file_size/1024**3 for pd in plot_data], [pd["elo"] for pd in plot_data],
         arrowprops=dict(arrowstyle="->", color="lightgray"), expand=(1.35, 2.3),
         force_explode=(0.4, 1.0), ensure_inside_axes=True, max_move=100)
 plt.xlabel("Model file size [GiB]")

@@ -1,16 +1,15 @@
 debug: False
-max_examples_per_dataset: -1
+max_examples_per_dataset: 100
 
 path_server: /home/johannesg/Projects/llama.cpp/build/bin/llama-server
-path_quantize: /home/johannesg/Projects/llama.cpp/build/bin/llama-quantize
 path_model: /opt/models/{name}-{quantization}.gguf
-path_imatrix: /opt/models/{name}.imatrix
+num_gpus: 6
 
 datasets:
   - gpqa_main
   - gsm8k_test
   - mmlu_test
-  - mmlu-pro_test
+  - mmlu_pro_test
 prompt_types:
   - instant
   - normal
@@ -43,30 +42,30 @@ parallel: 8
 gpus_per_job: 1
 
 models:
-  - name: gemma_2_it-9b
+  - base_name: gemma_2_it-9b
     parallel: 2
-  - name: gemma_3_it-1b
-  - name: gemma_3_it-4b
-  # - name: gemma_3_it-12b
-  #   gpus_per_job: 2
-  - name: glm_4_chat-9b
-  - name: llama_3.1_instruct-8b
-  - name: llama_3.2_instruct-1b
-  - name: llama_3.2_instruct-3b
-  - name: llama_4_scout_17b_16e_instruct-108b
-    quantizations: [q3_k_h]
-    gpus_per_job: 3
-  - name: ministral_instruct_2410-8b
-  - name: mistral_nemo_instruct_2407-12b
+  - base_name: gemma_3_it-1b
+  - base_name: gemma_3_it-4b
+  - base_name: gemma_3_it-12b
     gpus_per_job: 2
-  - name: mistral_small_3.1_instruct_2503-24b
-    gpus_per_job: 3
-  - name: phi_4-15b
+  - base_name: glm_4_chat-9b
+  - base_name: llama_3.1_instruct-8b
+  - base_name: llama_3.2_instruct-1b
+  - base_name: llama_3.2_instruct-3b
+  # - base_name: llama_4_scout_17b_16e_instruct-108b
+  #   quantizations: [q3_k_h]
+  #   gpus_per_job: 3
+  - base_name: ministral_instruct_2410-8b
+  - base_name: mistral_nemo_instruct_2407-12b
     gpus_per_job: 2
-  - name: phi_4_mini_instruct-4b
-  - name: qwen_2.5_instruct_1m-7b
-  # - name: qwq-32b
+  - base_name: mistral_small_3.1_instruct_2503-24b
+    gpus_per_job: 3
+  - base_name: phi_4-15b
+    gpus_per_job: 2
+  - base_name: phi_4_mini_instruct-4b
+  - base_name: qwen_2.5_instruct_1m-7b
+  # - base_name: qwq-32b
   #   # gpus_per_job: 4
   #   quantizations: [q8_0]
   #   gpus_per_job: 2
-  - name: stablelm_2_chat-2b
+  - base_name: stablelm_2_chat-2b
