@@ -220,7 +220,7 @@ else:
     wr_err_final = wr_err_test
     fit_final = fit_test
 
-fit_final.report(asymmetric_paramter_errors=True)
+fit_final.report(asymmetric_parameter_errors=True)
 print(f"wr_err_final={100*wr_err_final:.2f}%")
 
 nll_sat = fit_final.cost_function_value
