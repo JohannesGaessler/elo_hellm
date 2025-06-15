@@ -168,11 +168,11 @@ def get_fit(wr_err: float) -> CustomFit:
         return get_nll(pars, wr_err)
     pars: list[Parameter] = []
     for ms in model_scores[:-1]:
-        pars.append(Parameter(name=f"scale_{ms.name}", kind=Parameter.POSITIONAL_OR_KEYWORD, default=400))
+        pars.append(Parameter(name=f"scale_{ms.name.replace("-", "_")}", kind=Parameter.POSITIONAL_OR_KEYWORD, default=400))
     for ms in model_scores:
-        pars.append(Parameter(name=f"elo_{ms.name}", kind=Parameter.POSITIONAL_OR_KEYWORD, default=1500))
+        pars.append(Parameter(name=f"elo_{ms.name.replace("-", "_")}", kind=Parameter.POSITIONAL_OR_KEYWORD, default=1500))
     for model in config.models[:-1]:
-        pars.append(Parameter(name=f"elo_{model.name}", kind=Parameter.POSITIONAL_OR_KEYWORD, default=1500))
+        pars.append(Parameter(name=f"elo_{model.name.replace("-", "_")}", kind=Parameter.POSITIONAL_OR_KEYWORD, default=1500))
     func.__signature__ = Signature(pars)
 
     fit = CustomFit(func)
