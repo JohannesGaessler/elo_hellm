@@ -131,6 +131,8 @@ def get_nll(pars: np.ndarray, wr_err: float) -> float:
         residuals = wr - ms_i["ncorrect"] / ms_i["ntest"]
         nll += np.sum(np.square(residuals / err))
         # nll -= 2.0 * np.sum(binom.logpmf(k=ms_i["ncorrect"], n=ms_i["ntest"], p=wr))
+    if scales[-1] < 0:
+        nll += 1e6 * scales[-1] ** 2
     return nll
 
 
