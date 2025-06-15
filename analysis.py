@@ -231,7 +231,7 @@ chi2_prob = 1.0 - chi2.cdf(nll_sat, ndf)
 print(f"chi2 probability: {100*chi2_prob:.2f}%")
 print()
 
-final_scales, final_elos_datasets, final_elos_models = decompile_pars(fit_final.paramter_values)
+final_scales, final_elos_datasets, final_elos_models = decompile_pars(fit_final.parameter_values)
 final_scales_unc, final_elos_datasets_unc, final_elos_models_unc = decompile_pars(
     fit_final.parameter_errors, fit_final.parameter_cov_mat)
 
