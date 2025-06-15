@@ -48,9 +48,9 @@ class BenchmarkModelScores:
 ncorrect_total = 0
 ntest_total = 0
 model_scores = []
-for model_scores in config.datasets:
+for dataset in config.datasets:
     for prompt_type in config.prompt_types:
-        benchmark = get_benchmark(model_scores, prompt_type)
+        benchmark = get_benchmark(dataset, prompt_type)
         name: str = benchmark.database_name()
         print(f"## {name}")
         print()
