@@ -5,6 +5,8 @@ from typing import Iterable
 
 from adjustText import adjust_text
 from iminuit import Minuit
+from inspect import Parameter, Signature
+from kafe2 import CustomFit
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import chi2
@@ -161,56 +163,63 @@ for ms in model_scores:
     ndf += ms.ncorrect.shape[0]
 
 
-def get_minuit(wr_err: float):
-    def func(pars):
+def get_fit(wr_err: float) -> CustomFit:
+    def func(*pars):
         return get_nll(pars, wr_err)
-    m = Minuit(func, starting_pars)
-    m.errordef = 1.0
-    for i in range(len(starting_scales)):
-        m.limits[i] = (10, 1000)
-        # m.fixed[i] = True
-    m.migrad()
-    m.hesse()
-    return m
+    pars: list[Parameter] = []
+    for ms in model_scores[:-1]:
+        pars.append(Parameter(name=f"scale_{ms.name}", kind=Parameter.POSITIONAL_OR_KEYWORD, default=400))
+    for ms in model_scores:
+        pars.append(Parameter(name=f"elo_{ms.name}", kind=Parameter.POSITIONAL_OR_KEYWORD, default=1500))
+    for model in config.models[:-1]:
+        pars.append(Parameter(name=f"elo_{model.name}", kind=Parameter.POSITIONAL_OR_KEYWORD, default=1500))
+    func.__signature__ = Signature(pars)
+
+    fit = CustomFit(func)
+    for ms in model_scores[:-1]:
+        fit.limit_parameter(f"scale_{ms.name}", lower=1e-6)
+    fit.do_fit()
+    return fit
 
 
 tol = 1e-4
 wr_err_low = 0.00
 wr_err_high = 0.01
-m_low = get_minuit(wr_err_low)
-if m_low.fval <= ndf + tol:
+fit_low = get_fit(wr_err_low)
+if fit_low.cost_function_value <= ndf + tol:
     wr_err_final = wr_err_low
-    m_final = m_low
+    fit_final = fit_low
 else:
-    m_high = get_minuit(wr_err_high)
+    fit_high = get_fit(wr_err_high)
     i = 0
-    while m_high.fval > ndf:
+    while fit_high.cost_function_value > ndf:
         wr_err_low = wr_err_high
         wr_err_high += 0.01
-        m_low = m_high
-        m_high = get_minuit(wr_err_high)
+        fit_low = fit_high
+        fit_high = get_fit(wr_err_high)
         i += 1
         assert i <= 10
     wr_err_test = (wr_err_low + wr_err_high) / 2
-    m_test = get_minuit(wr_err_test)
+    fit_test = get_fit(wr_err_test)
 
     i = 0
-    while abs(m_test.fval - ndf) > tol and i < 10:
-        if m_test.fval > ndf:
+    while abs(fit_test.cost_function_value - ndf) > tol and i < 10:
+        if fit_test.cost_function_value > ndf:
             wr_err_low = wr_err_test
-            m_low = m_test
+            fit_low = fit_test
         else:
             wr_err_high = wr_err_test
-            m_high = m_test
+            fit_high = fit_test
         wr_err_test = (wr_err_low + wr_err_high) / 2
-        m_test = get_minuit(wr_err_test)
+        fit_test = get_fit(wr_err_test)
         i += 1
-    wr_err_final = wr_err_low
-    m_final = m_test
+    wr_err_final = wr_err_test
+    fit_final = fit_test
 
+fit_final.report(asymmetric_paramter_errors=True)
 print(f"wr_err_final={100*wr_err_final:.2f}%")
 
-nll_sat = m_final.fval
+nll_sat = fit_final.cost_function_value
 # for ms in model_scores:
     # nll_sat += 2.0 * np.sum(binom.logpmf(k=ms.ncorrect, n=ms.ntest, p=ms.ncorrect/ms.ntest))
 print(f"chi2 / NDF: {nll_sat:.2f}/{ndf} = {nll_sat/ndf if ndf > 0 else np.nan:.2f}")
@@ -218,11 +227,9 @@ chi2_prob = 1.0 - chi2.cdf(nll_sat, ndf)
 print(f"chi2 probability: {100*chi2_prob:.2f}%")
 print()
 
-print(f"Post-fit cost: {m_final.fval:.2f}")
-print()
-
-final_scales, final_elos_datasets, final_elos_models = decompile_pars(m_final.values)
-final_scales_unc, final_elos_datasets_unc, final_elos_models_unc = decompile_pars(m_final.errors, m_final.covariance)
+final_scales, final_elos_datasets, final_elos_models = decompile_pars(fit_final.paramter_values)
+final_scales_unc, final_elos_datasets_unc, final_elos_models_unc = decompile_pars(
+    fit_final.parameter_errors, fit_final.parameter_cov_mat)
 
 ms_elo_scale_unc = sorted(
     zip(model_scores, final_elos_datasets, final_scales, final_elos_datasets_unc, final_scales_unc),
