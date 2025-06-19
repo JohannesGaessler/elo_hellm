@@ -6,21 +6,17 @@ import yaml
 
 
 class Model:
-    base_name: str
-    quantization: str
     name: str
     path: str
     datasets: list[str]
     prompt_types: list[str]
     parallel: int
-    gpus_per_job: int
+    gpus_per_server: int
     file_size: int
 
-    def __init__(self, base_name: str, quantization: str, path: str, datasets: list[str], prompt_types: list[str], parallel: int, gpus_per_job: int):
-        assert type(base_name) is str
-        self.base_name = base_name
-        assert type(quantization) is str
-        self.quantization = quantization
+    def __init__(self, name: str, path: str, datasets: list[str], prompt_types: list[str], parallel: int, gpus_per_server: int):
+        assert type(name) is str
+        self.name = name
         assert type(path) is str
         self.path = path
         assert type(datasets) is list
@@ -29,10 +25,9 @@ class Model:
         self.prompt_types = prompt_types
         assert type(parallel) is int
         self.parallel = parallel
-        assert type(gpus_per_job) is int
-        self.gpus_per_job = gpus_per_job
+        assert type(gpus_per_server) is int
+        self.gpus_per_server = gpus_per_server
 
-        self.name = f"{self.base_name}-{self.quantization}"
         self.file_size = os.path.getsize(self.path)
 
 
@@ -42,12 +37,11 @@ class Config:
     path_server: str
     ctx_size: int
     num_gpus: int
-    path_model: str
+    model_dir: str
     datasets: list[str]
     prompt_types: list[str]
-    quantizations: list[str]
     parallel: int
-    gpus_per_job: int
+    gpus_per_server: int
     models: list[Model]
 
     def __init__(self, path: str):
@@ -63,18 +57,16 @@ class Config:
         assert type(self.ctx_size) is int
         self.num_gpus = config.get("num_gpus", 1)
         assert type(self.num_gpus) is int
-        self.path_model = config.get("path_model")
-        assert type(self.path_model) is str
+        self.model_dir = config.get("model_dir")
+        assert type(self.model_dir) is str
         self.datasets = config.get("datasets")
         assert type(self.datasets) is list
         self.prompt_types = config.get("prompt_types")
         assert type(self.prompt_types) is list
-        self.quantizations = config.get("quantizations")
-        assert type(self.quantizations) is list
         self.parallel = config.get("parallel", 8)
         assert type(self.parallel) is int
-        self.gpus_per_job = config.get("gpus_per_job", 1)
-        assert type(self.gpus_per_job) is int
+        self.gpus_per_server = config.get("gpus_per_server", 1)
+        assert type(self.gpus_per_server) is int
 
         models = config.get("models")
         assert type(models) is list
@@ -82,16 +74,13 @@ class Config:
         self.models = []
         for m in models:
             assert type(m) is dict
-            base_name: str = m.get("base_name")
-            quantizations: list[str] = m.get("quantizations", self.quantizations)
-            for q in quantizations:
-                self.models.append(Model(
-                    base_name=base_name,
-                    quantization=q,
-                    path=m.get("path_model", self.path_model).format(name=base_name, quantization=q),
-                    prompt_types=m.get("prompt_types", self.prompt_types),
-                    datasets=m.get("datasets", self.datasets),
-                    parallel=m.get("parallel", self.parallel),
-                    gpus_per_job=m.get("gpus_per_job", self.gpus_per_job),
-                ))
+            name: str = m.get("name")
+            self.models.append(Model(
+                name=name,
+                path=os.path.join(m.get("model_dir", self.model_dir), name),
+                prompt_types=m.get("prompt_types", self.prompt_types),
+                datasets=m.get("datasets", self.datasets),
+                parallel=m.get("parallel", self.parallel),
+                gpus_per_server=m.get("gpus_per_server", self.gpus_per_server),
+            ))
         self.models = sorted(self.models, key=lambda m: m.file_size, reverse=False)

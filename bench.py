@@ -22,12 +22,12 @@ def get_servers(model: Model) -> List[dict]:
     os.makedirs("logs", exist_ok=True)
 
     servers = []
-    for i in range(0, config.num_gpus, model.gpus_per_job):
+    for i in range(0, config.num_gpus, model.gpus_per_server):
         port = 1337 + i
         address = TEMPLATE_SERVER_ADDRESS.format(port=port)
 
         env: Dict[str, str] = dict(
-            CUDA_VISIBLE_DEVICES=",".join([str(j) for j in range(i, i+model.gpus_per_job)]),
+            CUDA_VISIBLE_DEVICES=",".join([str(j) for j in range(i, i+model.gpus_per_server)]),
         )
 
         popen_args: List[str] = [
