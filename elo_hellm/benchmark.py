@@ -7,12 +7,14 @@ import random
 import sqlite3
 from typing import Optional
 
+import chess
 import datasets
+from stockfish import Stockfish
 import yaml
 
+from elo_hellm.config import Config
 
-with open("config.yml") as f:
-    config: dict = yaml.safe_load(f)
+config: Config = Config("config.yml")
 
 path_db: str = os.path.join("results.sqlite")
 connection: sqlite3.Connection = None
@@ -90,10 +92,20 @@ def get_dataset(name: str) -> list[dict]:
             assert False
         for i, data_i in enumerate(data):
             data_i["iex"] = i
-        if config["max_examples_per_dataset"] >= 0:
-            data = data[:config["max_examples_per_dataset"]]
+        if config.max_examples_per_dataset >= 0:
+            data = data[:config.max_examples_per_dataset]
         datasets_usable[name] = data
     return deepcopy(datasets_usable[name])
+
+
+stockfish = None
+
+
+def get_stockfish():
+    if stockfish is None:
+        stockfish = Stockfish(path=config.stockfish_path, parameters=dict(
+            Threads=config.stockfish_threads, Hash=config.stockfish_hash, UCI_Chess960="true"))
+    return stockfish
 
 
 class Benchmark(ABC):
@@ -306,6 +318,113 @@ class BenchmarkMath(Benchmark):
             except ValueError:
                 break
         return pred
+
+
+class BenchmarkChess960(Benchmark):
+    nchoices: int = 10
+    nturns_chess: int = 10
+
+    def __init__(self, prompt_type: str):
+        super().__init__("chess960", prompt_type)
+        self.score_rng = 1.0 / self.nchoices
+
+    @override
+    def nturns(self) -> int:
+        if self.prompt_type == "instant":
+            return self.nturns_chess * 2
+        elif self.prompt_type == "normal":
+            return self.nturns_chess * 4
+        else:
+            assert False
+
+    @override
+    def database_columns(self) -> list[str]:
+        nturns: int = self.nturns()
+
+        ret: list[str] = ["model", "iex", "turn"]
+        for i in range(nturns):
+            ret += [f"label{i}", f"gen{i}", f"pred{i}", f"state{i + 1}"]
+        return ret
+
+    @override
+    def database_types(self) -> list[str]:
+        return ["TEXT", "INTEGER", "INTEGER"] + ["TEXT", "INTEGER", "INTEGER", "TEXT"] * self.nturns()
+
+    @staticmethod
+    def add_message_data(data: dict) -> None:
+        stockfish = get_stockfish()
+
+        iex: int = data["iex"]
+        turn: int = data["turn"]
+        prompt_type: str = data["prompt_type"]
+
+        state: str = chess.Board.from_chess960_pos(iex) if turn == 0 else data[f"state{turn}"]
+        stockfish.set_fen_position(state)
+        moves: list[dict] = stockfish.get_top_moves(BenchmarkChess960.nchoices)
+        data["label"] = 0  # TODO shuffle
+
+        active_player: str = "White" if turn % 2 == 0 else "Black"
+
+        messages: list[dict] = []
+        prompt_suffix = ""
+        grammar: Optional[str] = None
+
+        choices = [f"({letter}): {move['Move']}" for letter, move in zip(LETTERS, moves)]
+        choices_block = "\n".join(choices)
+        messages.append(dict(role="user", content=f"""Consider the following game of chess in Forsyth–Edwards Notation:
+
+{state}
+
+Which of the following moves is the best one for {active_player} to take?
+{choices_block}"""))
+
+        assert prompt_type == "instant"
+        prompt_suffix: str = "The best move for {active_player} to take is ("
+        grammar = f"root ::= [{''.join(LETTERS[:len(choices)])}]"
+
+        data["messages"] = messages
+        data["prompt_suffix"] = prompt_suffix
+        data["grammar"] = grammar
+
+    @staticmethod
+    def get_prediction(completion: str) -> int:
+        return LETTERS.index(completion[:1])
+
+    def update_database(self, model: str, data: list[dict]):
+        connection, cursor = get_db()
+        name: str = self.database_name()
+        nturns: int = self.nturns()
+        for d in data:
+            turn: int = d["turn"]
+            completion: str = d["completion"]
+            pred: int = self.get_prediction(completion)
+
+            if turn == 0:
+                values: list[str] = [model, str(d["iex"]), str(turn + 1), d["label"], completion, str(pred), d["state1"]]
+                sql: str = f"INSERT INTO {name} (model, iex, turn, label0, gen0, pred0, state1) VALUES ({', '.join(['?']*len(values))});"
+                cursor.execute(sql, values)
+            else:
+                sql: str = (f"UPDATE {name} SET turn=?, label{turn}=?, gen{turn}=?, pred{turn}=?, state{turn + 1}=? "
+                    "WHERE model=? AND iex=?;")
+                cursor.execute(sql, [turn + 1, d["label"], completion, pred, d[f"state{turn + 1}"], model, d["iex"]])
+        connection.commit()
+
+    def get_results(self, model: str):
+        cursor: sqlite3.Cursor = get_db()[1]
+
+        nturns: int = self.nturns()
+        data: list[dict] = self.get_input_data(model, nturns)
+        labels_preds: list[str] = [f"label{i}, pred{i}" for i in range(nturns)]
+        sql: str = (f"SELECT {', '.join(labels_preds)} FROM {self.database_name()} "
+            f"WHERE model = ? AND iex < ? AND turn = ? ORDER BY iex;")
+        query = cursor.execute(sql, [model, len(data), nturns])
+        labels = []
+        pred = []
+        for q in query:
+            for i in range(nturns):
+                labels.append(q[2*i + 0])
+                pred.append(q[2*i + 1])
+        return labels, pred
 
 
 benchmarks: dict[tuple[str, str], Benchmark] = dict()

@@ -35,6 +35,9 @@ class Config:
     debug: bool
     max_examples_per_dataset: int
     path_server: str
+    stockfish_path: str
+    stockfish_threads: int
+    stockfish_hash: int
     ctx_size: int
     num_gpus: int
     model_dir: str
@@ -53,6 +56,12 @@ class Config:
         assert type(self.max_examples_per_dataset) is int
         self.path_server = config.get("path_server")
         assert type(self.path_server) is str
+        self.stockfish_path = config.get("stockfish_path", "/usr/bin/stockfish")
+        assert type(self.stockfish_path) is str
+        self.stockfish_threads = config.get("stockfish_threads", 8)
+        assert type(self.stockfish_threads) is int
+        self.stockfish_hash = config.get("stockfish_hash", 1024)
+        assert type(self.stockfish_hash) is int
         self.ctx_size = config.get("ctx_size", 4096)
         assert type(self.ctx_size) is int
         self.num_gpus = config.get("num_gpus", 1)
