@@ -383,6 +383,7 @@ class BenchmarkChess960(Benchmark):
             sql: str = "INSERT INTO stockfish_cache VALUES (?, ?);"
             cursor.execute(sql, [state, json.dumps(moves)])
         data["label"] = 0  # TODO shuffle
+        data["moves"] = moves
 
         active_player: str = "White" if turn % 2 == 0 else "Black"
 
@@ -418,15 +419,20 @@ Which of the following moves is the best one for {active_player} to take?
             turn: int = d["turn"]
             completion: str = d["completion"]
             pred: int = self.get_prediction(completion)
+            move_uci: str = data["moves"][pred]["Move"]
+
+            board = chess.Board(d[f"state{turn}"])
+            board.push(chess.Move.from_uci(move_uci))
+            state_next: str = board.fen()
 
             if turn == 0:
-                values: list[str] = [model, str(d["iex"]), str(turn + 1), d["label"], completion, str(pred), d["state1"]]
+                values: list[str] = [model, str(d["iex"]), str(turn + 1), d["label"], completion, str(pred), state_next]
                 sql: str = f"INSERT INTO {name} (model, iex, turn, label0, gen0, pred0, state1) VALUES ({', '.join(['?']*len(values))});"
                 cursor.execute(sql, values)
             else:
                 sql: str = (f"UPDATE {name} SET turn=?, label{turn}=?, gen{turn}=?, pred{turn}=?, state{turn + 1}=? "
                     "WHERE model=? AND iex=?;")
-                cursor.execute(sql, [turn + 1, d["label"], completion, pred, d[f"state{turn + 1}"], model, d["iex"]])
+                cursor.execute(sql, [turn + 1, d["label"], completion, pred, state_next, model, d["iex"]])
         connection.commit()
 
     def get_results(self, model: str):
