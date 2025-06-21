@@ -171,7 +171,7 @@ class Benchmark(ABC):
 
         columns: list[str] = ["iex"] + [f"gen{i}" for i in range(turn)]
         if self.has_state:
-            columns += [f"state{i + 1}" for i in range(1, turn)]
+            columns += [f"state{i}" for i in range(1, turn + 1)]
         sql: str = f"SELECT {', '.join(columns)} FROM {self.database_name()} WHERE model = ? AND iex < ? AND turn = ? ORDER BY iex;"
         query = cursor.execute(sql, [model, len(data), turn]).fetchall()
 
@@ -182,8 +182,8 @@ class Benchmark(ABC):
             for i in range(turn):
                 dti[f"gen{i}"] = q[1 + i]
             if self.has_state:
-                for i in range(turn):
-                    dti[f"state{i + 1}"] = q[1 + turn + i]
+                for i in range(1, turn + 1):
+                    dti[f"state{i}"] = q[1 + turn + i - 1]
             data_turn.append(dti)
         for dt in tqdm(data_turn, desc=f"get_input_data for {self.database_name()}"):
             dt["turn"] = turn
