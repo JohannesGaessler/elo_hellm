@@ -7,7 +7,8 @@ num_gpus: 6
 
 stockfish_path: /usr/bin/stockfish
 stockfish_threads: 128
-stockfish_hash: 262144  # 256 GiB
+# stockfish_hash: 262144  # 256 GiB
+stockfish_hash: 2048
 
 datasets:
   - gpqa_main
