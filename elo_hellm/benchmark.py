@@ -328,7 +328,6 @@ class BenchmarkChess960(Benchmark):
         super().__init__("chess960", prompt_type)
         self.score_rng = 1.0 / self.nchoices
 
-    @override
     def nturns(self) -> int:
         if self.prompt_type == "instant":
             return self.nturns_chess * 2
@@ -337,7 +336,6 @@ class BenchmarkChess960(Benchmark):
         else:
             assert False
 
-    @override
     def database_columns(self) -> list[str]:
         nturns: int = self.nturns()
 
@@ -346,7 +344,6 @@ class BenchmarkChess960(Benchmark):
             ret += [f"label{i}", f"gen{i}", f"pred{i}", f"state{i + 1}"]
         return ret
 
-    @override
     def database_types(self) -> list[str]:
         return ["TEXT", "INTEGER", "INTEGER"] + ["TEXT", "INTEGER", "INTEGER", "TEXT"] * self.nturns()
 
