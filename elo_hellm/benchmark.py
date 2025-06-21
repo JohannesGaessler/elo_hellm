@@ -119,13 +119,16 @@ def get_dataset(name: str) -> list[dict]:
 class Benchmark(ABC):
     name: str
     prompt_type: str
+    has_state: bool
     npredict_last: int
     score_rng: float
 
-    def __init__(self, name: str, prompt_type: str):
+    def __init__(self, name: str, prompt_type: str, has_state: bool):
         self.name = name
         assert prompt_type in ["normal", "instant"]
         self.prompt_type = prompt_type
+        assert type(has_state) is bool
+        self.has_state = has_state
 
         connection, cursor = get_db()
         columns_types: list[str] = [f"{c} {t}" for (c, t) in zip(self.database_columns(), self.database_types())]
@@ -167,6 +170,8 @@ class Benchmark(ABC):
             return data_turn
 
         columns: list[str] = ["iex"] + [f"gen{i}" for i in range(turn)]
+        if self.has_state:
+            columns += [f"state{i}" for i in range(turn)]
         sql: str = f"SELECT {', '.join(columns)} FROM {self.database_name()} WHERE model = ? AND iex < ? AND turn = ? ORDER BY iex;"
         query = cursor.execute(sql, [model, len(data), turn]).fetchall()
 
@@ -176,6 +181,9 @@ class Benchmark(ABC):
             dti: dict = data[iex]
             for i in range(turn):
                 dti[f"gen{i}"] = q[1 + i]
+            if self.has_state:
+                for i in range(turn):
+                    dti[f"state{i}"] = q[1 + turn + i]
             data_turn.append(dti)
         for dt in tqdm(data_turn, desc=f"get_input_data for {self.database_name()}"):
             dt["turn"] = turn
@@ -236,7 +244,7 @@ class BenchmarkMultipleChoice(Benchmark):
     nchoices: int
 
     def __init__(self, name: str, prompt_type: str):
-        super().__init__(name, prompt_type)
+        super().__init__(name, prompt_type, has_state=False)
         self.npredict_last = 1
         if name == "gpqa_main":
             self.nchoices = 5
@@ -285,7 +293,7 @@ Which of the following answers is correct?
 
 
 class BenchmarkMath(Benchmark):
-    def __init__(self, name: str, prompt_type: str):
+    def __init__(self, name: str, prompt_type: str, has_state=False):
         super().__init__(name, prompt_type)
         self.npredict_last = 10
         self.score_rng = 0.0
@@ -335,7 +343,7 @@ class BenchmarkChess960(Benchmark):
     nturns_chess: int = 10
 
     def __init__(self, prompt_type: str):
-        super().__init__("chess960", prompt_type)
+        super().__init__("chess960", prompt_type, has_state=True)
         self.score_rng = 1.0 / self.nchoices
 
         connection, cursor = get_db()
