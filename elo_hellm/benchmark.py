@@ -177,7 +177,7 @@ class Benchmark(ABC):
             for i in range(turn):
                 dti[f"gen{i}"] = q[1 + i]
             data_turn.append(dti)
-        for dt in data_turn:
+        for dt in tqdm(data_turn, desc=f"get_input_data for {self.database_name()}"):
             dt["turn"] = turn
             dt["prompt_type"] = self.prompt_type
             dt["npredict"] = self.npredict_last if turn + 1 == nturns else 2048  # FIXME
