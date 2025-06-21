@@ -35,6 +35,7 @@ stockfish = None
 def get_stockfish():
     global stockfish
     if stockfish is None:
+        print("Loading stockfish...")
         stockfish = Stockfish(path=config.stockfish_path, parameters=dict(
             Threads=config.stockfish_threads, Hash=config.stockfish_hash, UCI_Chess960="true"))
     return stockfish
@@ -100,6 +101,7 @@ def get_dataset(name: str) -> list[dict]:
             data = [dict(question=ex["question"], choices=ex["options"], answer=ex["answer_index"]) for ex in mmlu_pro_raw]
             data = list(filter(lambda d: len(d["choices"]) == 10, data))
         elif name == "chess960":
+            print("Generating chess960 initial states...")
             data = []
             for i in range(960):
                 data.append(dict(state0=chess.Board.from_chess960_pos(i).fen()))
