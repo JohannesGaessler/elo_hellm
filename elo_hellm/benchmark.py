@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
+import json
 import os
 import random
 import sqlite3
@@ -149,7 +150,7 @@ class Benchmark(ABC):
 
     def get_input_data(self, model: str, turn: int) -> list[dict]:
         data = get_dataset(self.name)
-        cursor: sqlite3.Cursor = get_db()[1]
+        connection, cursor = get_db()
         nturns: int = self.nturns()
 
         if turn == 0:
@@ -162,6 +163,7 @@ class Benchmark(ABC):
                 dt["prompt_type"] = self.prompt_type
                 dt["npredict"] = self.npredict_last if turn + 1 == nturns else 2048  # FIXME
                 self.add_message_data(dt)
+            connection.commit()
             return data_turn
 
         columns: list[str] = ["iex"] + [f"gen{i}" for i in range(turn)]
@@ -180,6 +182,7 @@ class Benchmark(ABC):
             dt["prompt_type"] = self.prompt_type
             dt["npredict"] = self.npredict_last if turn + 1 == nturns else 2048  # FIXME
             self.add_message_data(dt)
+        connection.commit()
         return data_turn
 
     @staticmethod
@@ -335,6 +338,11 @@ class BenchmarkChess960(Benchmark):
         super().__init__("chess960", prompt_type)
         self.score_rng = 1.0 / self.nchoices
 
+        connection, cursor = get_db()
+        sql: str = "CREATE TABLE IF NOT EXISTS stockfish_cache(fen TEXT, moves TEXT NOT NULL) PRIMARY KEY fen;"
+        cursor.execute(sql)
+        connection.commit()
+
     def nturns(self) -> int:
         if self.prompt_type == "instant":
             return self.nturns_chess * 2
@@ -362,8 +370,18 @@ class BenchmarkChess960(Benchmark):
         prompt_type: str = data["prompt_type"]
         state: str = data[f"state{turn}"]
 
-        stockfish.set_fen_position(state)
-        moves: list[dict] = stockfish.get_top_moves(BenchmarkChess960.nchoices)
+        cursor: sqlite3.Cursor = get_db()[1]
+        sql: str = "SELECT moves FROM stockfish_cache WHERE fen=?;"
+        query: list = cursor.execute(sql).fetchall()
+
+        if query:
+            assert len(query) == 1
+            moves: list[dict] = json.loads(query[0][0])
+        else:
+            stockfish.set_fen_position(state)
+            moves: list[dict] = stockfish.get_top_moves(BenchmarkChess960.nchoices)
+            sql: str = "INSERT INTO stockfish_cache VALUES (?, ?);"
+            cursor.execute(sql, [state, json.dumps(moves)])
         data["label"] = 0  # TODO shuffle
 
         active_player: str = "White" if turn % 2 == 0 else "Black"
