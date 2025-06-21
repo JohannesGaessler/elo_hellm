@@ -433,7 +433,7 @@ def get_benchmark(dataset: str, prompt_type: str) -> Benchmark:
             benchmark = BenchmarkMath(dataset, prompt_type)
         elif dataset in ["gpqa_main", "mmlu_test", "mmlu_pro_test"]:
             benchmark = BenchmarkMultipleChoice(dataset, prompt_type)
-        elif dataset == ["chess960"]:
+        elif dataset == "chess960":
             benchmark = BenchmarkChess960(prompt_type)
         else:
             assert False
