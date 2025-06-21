@@ -372,7 +372,7 @@ class BenchmarkChess960(Benchmark):
 
         cursor: sqlite3.Cursor = get_db()[1]
         sql: str = "SELECT moves FROM stockfish_cache WHERE fen=?;"
-        query: list = cursor.execute(sql).fetchall()
+        query: list = cursor.execute(sql, [state]).fetchall()
 
         if query:
             assert len(query) == 1
