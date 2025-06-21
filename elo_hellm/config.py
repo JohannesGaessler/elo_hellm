@@ -38,6 +38,7 @@ class Config:
     stockfish_path: str
     stockfish_threads: int
     stockfish_hash: int
+    stockfish_nchoices: int
     ctx_size: int
     num_gpus: int
     model_dir: str
@@ -62,6 +63,8 @@ class Config:
         assert type(self.stockfish_threads) is int
         self.stockfish_hash = config.get("stockfish_hash", 1024)
         assert type(self.stockfish_hash) is int
+        self.stockfish_nchoices = config.get("stockfish_nchoices", 10)
+        assert type(self.stockfish_nchoices) is int
         self.ctx_size = config.get("ctx_size", 4096)
         assert type(self.ctx_size) is int
         self.num_gpus = config.get("num_gpus", 1)

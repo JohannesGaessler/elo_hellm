@@ -29,6 +29,17 @@ def get_db() -> tuple[sqlite3.Connection, sqlite3.Cursor]:
     return connection, cursor
 
 
+stockfish = None
+
+
+def get_stockfish():
+    global stockfish
+    if stockfish is None:
+        stockfish = Stockfish(path=config.stockfish_path, parameters=dict(
+            Threads=config.stockfish_threads, Hash=config.stockfish_hash, UCI_Chess960="true"))
+    return stockfish
+
+
 datasets_raw: dict = dict()
 
 
@@ -88,6 +99,10 @@ def get_dataset(name: str) -> list[dict]:
             mmlu_pro_raw = get_dataset_raw("mmlu_pro")["test"]
             data = [dict(question=ex["question"], choices=ex["options"], answer=ex["answer_index"]) for ex in mmlu_pro_raw]
             data = list(filter(lambda d: len(d["choices"]) == 10, data))
+        elif name == "chess960":
+            data = []
+            for i in range(960):
+                data.append(dict(state0=chess.Board.from_chess960_pos(i).fen()))
         else:
             assert False
         for i, data_i in enumerate(data):
@@ -96,16 +111,6 @@ def get_dataset(name: str) -> list[dict]:
             data = data[:config.max_examples_per_dataset]
         datasets_usable[name] = data
     return deepcopy(datasets_usable[name])
-
-
-stockfish = None
-
-
-def get_stockfish():
-    if stockfish is None:
-        stockfish = Stockfish(path=config.stockfish_path, parameters=dict(
-            Threads=config.stockfish_threads, Hash=config.stockfish_hash, UCI_Chess960="true"))
-    return stockfish
 
 
 class Benchmark(ABC):
@@ -351,11 +356,10 @@ class BenchmarkChess960(Benchmark):
     def add_message_data(data: dict) -> None:
         stockfish = get_stockfish()
 
-        iex: int = data["iex"]
         turn: int = data["turn"]
         prompt_type: str = data["prompt_type"]
+        state: str = data[f"state{turn}"]
 
-        state: str = chess.Board.from_chess960_pos(iex) if turn == 0 else data[f"state{turn}"]
         stockfish.set_fen_position(state)
         moves: list[dict] = stockfish.get_top_moves(BenchmarkChess960.nchoices)
         data["label"] = 0  # TODO shuffle
@@ -390,7 +394,6 @@ Which of the following moves is the best one for {active_player} to take?
     def update_database(self, model: str, data: list[dict]):
         connection, cursor = get_db()
         name: str = self.database_name()
-        nturns: int = self.nturns()
         for d in data:
             turn: int = d["turn"]
             completion: str = d["completion"]
