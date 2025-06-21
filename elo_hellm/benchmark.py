@@ -419,7 +419,7 @@ Which of the following moves is the best one for {active_player} to take?
             turn: int = d["turn"]
             completion: str = d["completion"]
             pred: int = self.get_prediction(completion)
-            move_uci: str = data["moves"][pred]["Move"]
+            move_uci: str = d["moves"][pred]["Move"]
 
             board = chess.Board(d[f"state{turn}"])
             board.push(chess.Move.from_uci(move_uci))
