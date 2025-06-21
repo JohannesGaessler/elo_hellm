@@ -293,8 +293,8 @@ Which of the following answers is correct?
 
 
 class BenchmarkMath(Benchmark):
-    def __init__(self, name: str, prompt_type: str, has_state=False):
-        super().__init__(name, prompt_type)
+    def __init__(self, name: str, prompt_type: str):
+        super().__init__(name, prompt_type, has_state=False)
         self.npredict_last = 10
         self.score_rng = 0.0
 
