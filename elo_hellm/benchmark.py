@@ -339,7 +339,7 @@ class BenchmarkChess960(Benchmark):
         self.score_rng = 1.0 / self.nchoices
 
         connection, cursor = get_db()
-        sql: str = "CREATE TABLE IF NOT EXISTS stockfish_cache(fen TEXT, moves TEXT NOT NULL) PRIMARY KEY fen;"
+        sql: str = "CREATE TABLE IF NOT EXISTS stockfish_cache(fen TEXT, moves TEXT NOT NULL, PRIMARY KEY (fen));"
         cursor.execute(sql)
         connection.commit()
 
