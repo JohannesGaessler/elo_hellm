@@ -476,7 +476,7 @@ Which of the following moves is the best one for {active_player} to take?
                 moves: list[dict] = d["moves"]
                 legal_moves: list[dict] = list(filter(lambda m: not m.get("illegal", False), moves))
                 assert legal_moves
-                legal_moves = sorted(legal_moves, BenchmarkChess960.move_to_key)
+                legal_moves = sorted(legal_moves, key=BenchmarkChess960.move_to_key)
                 worst_legal_move_uci = legal_moves[-1]["Move"]
                 board.push(chess.Move.from_uci(worst_legal_move_uci))
             state_next: str = board.fen()
