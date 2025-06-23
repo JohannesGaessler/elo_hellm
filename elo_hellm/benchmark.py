@@ -387,7 +387,6 @@ class BenchmarkChess960(Benchmark):
                 if m["Move"] == random_move:
                     continue
             moves.append(dict(Move=random_move, illegal=True))
-        return ret
 
     @staticmethod
     def move_to_key(move: dict) -> int:
