@@ -382,7 +382,7 @@ class BenchmarkChess960(Benchmark):
         NUMBERS = ["1", "2", "3", "4", "5", "6", "7", "8"]
 
         while len(moves) < BenchmarkChess960.nchoices:
-            random_move: str = f"{random.choice(LETTERS)}{random.choice(NUMBERS)}_{random.choice(LETTERS)}{random.choice(NUMBERS)}"
+            random_move: str = random.choice(LETTERS) + random.choice(NUMBERS) + random.choice(LETTERS) + random.choice(NUMBERS)
             for m in moves:
                 if m["Move"] == random_move:
                     continue
