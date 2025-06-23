@@ -339,7 +339,7 @@ class BenchmarkMath(Benchmark):
 
 
 class BenchmarkChess960(Benchmark):
-    nchoices: int = 4
+    nchoices: int = 10
     nturns_chess: int = 10
 
     def __init__(self, prompt_type: str):
@@ -372,13 +372,34 @@ class BenchmarkChess960(Benchmark):
         return ["TEXT", "INTEGER", "INTEGER"] + ["TEXT", "INTEGER", "INTEGER", "TEXT"] * self.nturns()
 
     @staticmethod
+    def add_random_moves(moves: list[dict], iex: int, turn: int) -> None:
+        assert len(moves) <= BenchmarkChess960.nchoices
+        if len(moves) == BenchmarkChess960.nchoices:
+            return
+        random.seed(1234567 + 1000*iex + turn)
+
+        LETTERS = ["a", "b", "c", "d", "e", "f", "g", "h"]
+        NUMBERS = ["1", "2", "3", "4", "5", "6", "7", "8"]
+
+        while len(moves) < BenchmarkChess960.nchoices:
+            random_move: str = f"{random.choice(LETTERS)}{random.choice(NUMBERS)}_{random.choice(LETTERS)}{random.choice(NUMBERS)}"
+            for m in moves:
+                if m["Move"] == random_move:
+                    continue
+            moves.append(dict(Move=random_move, illegal=True))
+        return ret
+
+    @staticmethod
     def move_to_key(move: dict) -> int:
+        illegal: bool = move.get("illegal", False)
+        if illegal:
+            return -1000000
         mate: Optional[int] = move["Mate"]
         if mate is not None:
             if mate > 0:
-                return 1000000 + mate
+                return 1000 + mate
             else:
-                return -1000000 - mate
+                return -1000 - mate
         return move["Centipawn"]
 
     @staticmethod
@@ -401,15 +422,14 @@ class BenchmarkChess960(Benchmark):
             stockfish.set_fen_position(state)
             moves: list[dict] = stockfish.get_top_moves(BenchmarkChess960.nchoices)
             moves = sorted(moves, key=BenchmarkChess960.move_to_key, reverse=True)
+            BenchmarkChess960.add_random_moves(moves, iex, turn)
             print(moves, len(moves))
-            assert len(moves) == BenchmarkChess960.nchoices
+
             sql: str = "INSERT INTO stockfish_cache VALUES (?, ?);"
             cursor.execute(sql, [state, json.dumps(moves)])
 
         permutation = [i for i in range(BenchmarkChess960.nchoices)]
-        random.seed(123456 + iex)
-        for _ in range(turn + 1):
-            random.shuffle(permutation)
+        random.seed(123456 + 1000*iex + turn)
 
         data["label"] = permutation.index(0)
         data["moves"] = [moves[permutation[i]] for i in permutation]
