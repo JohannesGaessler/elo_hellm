@@ -472,7 +472,7 @@ Which of the following moves is the best one for {active_player} to take?
             board = chess.Board(d[f"state{turn}"])
             try:
                 board.push(chess.Move.from_uci(move_uci))
-            except chess.InvalidMoveError, chess.IllegalMoveError:
+            except (chess.InvalidMoveError, chess.IllegalMoveError):
                 moves: list[dict] = d["moves"]
                 legal_moves: list[dict] = list(filter(lambda m: not m.get("illegal", False), moves))
                 assert legal_moves
