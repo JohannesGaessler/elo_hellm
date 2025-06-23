@@ -390,6 +390,10 @@ class BenchmarkChess960(Benchmark):
         else:
             stockfish.set_fen_position(state)
             moves: list[dict] = stockfish.get_top_moves(BenchmarkChess960.nchoices)
+            for m in moves:
+                assert m["Mate"] is None
+            moves = sorted(moves, key=lambda m: m["Centipawn"], reverse=True)
+            print(moves, len(moves))
             assert len(moves) == BenchmarkChess960.nchoices
             sql: str = "INSERT INTO stockfish_cache VALUES (?, ?);"
             cursor.execute(sql, [state, json.dumps(moves)])
