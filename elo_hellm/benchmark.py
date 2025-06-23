@@ -400,8 +400,6 @@ class BenchmarkChess960(Benchmark):
         else:
             stockfish.set_fen_position(state)
             moves: list[dict] = stockfish.get_top_moves(BenchmarkChess960.nchoices)
-            for m in moves:
-                assert m["Mate"] is None
             moves = sorted(moves, key=BenchmarkChess960.move_to_key, reverse=True)
             print(moves, len(moves))
             assert len(moves) == BenchmarkChess960.nchoices
