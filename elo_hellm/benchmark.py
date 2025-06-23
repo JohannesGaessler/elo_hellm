@@ -426,7 +426,6 @@ class BenchmarkChess960(Benchmark):
 
             sql: str = "INSERT INTO stockfish_cache VALUES (?, ?);"
             cursor.execute(sql, [state, json.dumps(moves)])
-
         permutation = [i for i in range(BenchmarkChess960.nchoices)]
         random.seed(123456 + 1000*iex + turn)
         random.shuffle(permutation)
@@ -471,7 +470,15 @@ Which of the following moves is the best one for {active_player} to take?
             move_uci: str = d["moves"][pred]["Move"]
 
             board = chess.Board(d[f"state{turn}"])
-            board.push(chess.Move.from_uci(move_uci))
+            try:
+                board.push(chess.Move.from_uci(move_uci))
+            except chess.IllegalMoveError:
+                moves: list[dict] = d["moves"]
+                legal_moves: list[dict] = list(filter(lambda m: not m.get("illegal", False), moves))
+                assert legal_moves
+                legal_moves = sorted(legal_moves, BenchmarkChess960.move_to_key)
+                worst_legal_move_uci = legal_moves[-1]["Move"]
+                board.push(chess.Move.from_uci(worst_legal_move_uci))
             state_next: str = board.fen()
 
             if turn == 0:
