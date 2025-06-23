@@ -430,6 +430,7 @@ class BenchmarkChess960(Benchmark):
 
         permutation = [i for i in range(BenchmarkChess960.nchoices)]
         random.seed(123456 + 1000*iex + turn)
+        random.shuffle(permutation)
 
         data["label"] = permutation.index(0)
         data["moves"] = [moves[permutation[i]] for i in permutation]
