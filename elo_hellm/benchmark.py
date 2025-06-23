@@ -375,6 +375,7 @@ class BenchmarkChess960(Benchmark):
     def add_message_data(data: dict) -> None:
         stockfish = get_stockfish()
 
+        iex: int = data["iex"]
         turn: int = data["turn"]
         prompt_type: str = data["prompt_type"]
         state: str = data[f"state{turn}"]
@@ -389,10 +390,17 @@ class BenchmarkChess960(Benchmark):
         else:
             stockfish.set_fen_position(state)
             moves: list[dict] = stockfish.get_top_moves(BenchmarkChess960.nchoices)
+            assert len(moves) == BenchmarkChess960.nchoices
             sql: str = "INSERT INTO stockfish_cache VALUES (?, ?);"
             cursor.execute(sql, [state, json.dumps(moves)])
-        data["label"] = 0  # TODO shuffle
-        data["moves"] = moves
+
+        permutation = [i for i in range(BenchmarkChess960.nchoices)]
+        random.seed(123456 + iex)
+        for _ in range(turn + 1):
+            random.shuffle(permutation)
+
+        data["label"] = permutation.index(0)
+        data["moves"] = [moves[permutation[i]] for i in permutation]
 
         active_player: str = "White" if turn % 2 == 0 else "Black"
 
@@ -410,7 +418,7 @@ Which of the following moves is the best one for {active_player} to take?
 {choices_block}"""))
 
         assert prompt_type == "instant"
-        prompt_suffix: str = "The best move for {active_player} to take is ("
+        prompt_suffix: str = f"The best move for {active_player} to take is ("
         grammar = f"root ::= [{''.join(LETTERS[:len(choices)])}]"
 
         data["messages"] = messages
