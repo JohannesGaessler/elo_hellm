@@ -372,6 +372,16 @@ class BenchmarkChess960(Benchmark):
         return ["TEXT", "INTEGER", "INTEGER"] + ["TEXT", "INTEGER", "INTEGER", "TEXT"] * self.nturns()
 
     @staticmethod
+    def move_to_key(move: dict) -> int:
+        mate: Optional[int] = move["Mate"]
+        if mate is not None:
+            if mate > 0:
+                return 1000000 + mate
+            else:
+                return -1000000 - mate
+        return move["Centipawn"]
+
+    @staticmethod
     def add_message_data(data: dict) -> None:
         stockfish = get_stockfish()
 
@@ -392,7 +402,7 @@ class BenchmarkChess960(Benchmark):
             moves: list[dict] = stockfish.get_top_moves(BenchmarkChess960.nchoices)
             for m in moves:
                 assert m["Mate"] is None
-            moves = sorted(moves, key=lambda m: m["Centipawn"], reverse=True)
+            moves = sorted(moves, key=BenchmarkChess960.move_to_key, reverse=True)
             print(moves, len(moves))
             assert len(moves) == BenchmarkChess960.nchoices
             sql: str = "INSERT INTO stockfish_cache VALUES (?, ?);"
