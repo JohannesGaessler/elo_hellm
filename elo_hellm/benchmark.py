@@ -339,7 +339,7 @@ class BenchmarkMath(Benchmark):
 
 
 class BenchmarkChess960(Benchmark):
-    nchoices: int = 10
+    nchoices: int = 4
     nturns_chess: int = 10
 
     def __init__(self, prompt_type: str):
