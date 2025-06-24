@@ -63,7 +63,7 @@ def get_servers(model: Model) -> List[dict]:
 
 
 def get_completion(data: dict) -> str:
-    data["get_message_data"](data)
+    data["add_message_data"](data)
 
     server_address: str = data["server_address"]
     npredict: int = data["npredict"]
