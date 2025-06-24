@@ -412,7 +412,6 @@ class BenchmarkChess960(Benchmark):
             moves: list[dict] = local_data.stockfish.get_top_moves(BenchmarkChess960.nchoices)
             moves = sorted(moves, key=BenchmarkChess960.move_to_key, reverse=True)
             BenchmarkChess960.add_random_moves(moves, iex, turn)
-            print(moves, len(moves))
 
             sql: str = "INSERT INTO stockfish_cache VALUES (?, ?);"
             local_data.cursor.execute(sql, [state, json.dumps(moves)])
