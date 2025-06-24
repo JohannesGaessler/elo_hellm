@@ -63,6 +63,8 @@ def get_servers(model: Model) -> List[dict]:
 
 
 def get_completion(data: dict) -> str:
+    data["get_message_data"](data)
+
     server_address: str = data["server_address"]
     npredict: int = data["npredict"]
     grammar: Optional[str] = data["grammar"]
@@ -110,6 +112,7 @@ def process_model(model: Model):
                     max_workers: int = 2 * len(servers) * model.parallel
                     chunksize: int = 1
                     completions = thread_map(get_completion, data, max_workers=max_workers, chunksize=chunksize)
+                    # Database now potentially has uncommitted changes, will be fixed committed with update_database.
                     for d, c in zip(data, completions):
                         d["completion"] = c
                     benchmark.update_database(model.name, data)

@@ -161,12 +161,11 @@ class Benchmark(ABC):
             query: list[tuple[int]] = cursor.execute(sql, [model, turn]).fetchall()
             indices_done: list[int] = [q[0] for q in query]
             data_turn = list(filter(lambda d: d["iex"] not in indices_done, data))
-            for dt in tqdm(data_turn, desc=f"get_input_data for {self.database_name()}"):
+            for dt in data_turn:
                 dt["turn"] = turn
                 dt["prompt_type"] = self.prompt_type
                 dt["npredict"] = self.npredict_last if self.has_state or turn + 1 == nturns else 2048  # FIXME
-                self.add_message_data(dt)
-            connection.commit()
+                dt["add_message_data"] = self.add_message_data
             return data_turn
 
         columns: list[str] = ["iex"] + [f"gen{i}" for i in range(turn)]
@@ -185,12 +184,11 @@ class Benchmark(ABC):
                 for i in range(1, turn + 1):
                     dti[f"state{i}"] = q[1 + turn + i - 1]
             data_turn.append(dti)
-        for dt in tqdm(data_turn, desc=f"get_input_data for {self.database_name()}"):
+        for dt in data_turn:
             dt["turn"] = turn
             dt["prompt_type"] = self.prompt_type
             dt["npredict"] = self.npredict_last if self.has_state or turn + 1 == nturns else 2048  # FIXME
-            self.add_message_data(dt)
-        connection.commit()
+            dt["add_message_data"] = self.add_message_data
         return data_turn
 
     @staticmethod
