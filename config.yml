@@ -6,8 +6,8 @@ model_dir: /opt/models
 num_gpus: 6
 
 stockfish_path: /usr/bin/stockfish
-stockfish_threads: 8
-stockfish_hash: 4096  # 4 GiB
+stockfish_threads: 1
+stockfish_hash: 2096  # 2 GiB
 
 datasets:
   - gpqa_main
