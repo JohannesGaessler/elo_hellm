@@ -418,6 +418,7 @@ class BenchmarkChess960(Benchmark):
             assert len(query) == 1
             moves: list[dict] = json.loads(query[0][0])
         else:
+            assert stockfish.is_fen_valid(state)
             stockfish.set_fen_position(state)
             moves: list[dict] = stockfish.get_top_moves(BenchmarkChess960.nchoices)
             moves = sorted(moves, key=BenchmarkChess960.move_to_key, reverse=True)
