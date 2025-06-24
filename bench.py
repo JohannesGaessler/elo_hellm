@@ -7,7 +7,7 @@ from typing import Dict, Optional, List
 
 import requests
 import subprocess
-from tqdm.contrib.concurrent import process_map
+from tqdm.contrib.concurrent import thread_map
 
 from elo_hellm.benchmark import Benchmark, get_benchmark
 from elo_hellm.config import Config, Model
@@ -109,7 +109,7 @@ def process_model(model: Model):
                     print(f"Start: {model.name}, {benchmark.database_name()}, turn={turn}")
                     max_workers: int = 2 * len(servers) * model.parallel
                     chunksize: int = 1
-                    completions = process_map(get_completion, data, max_workers=max_workers, chunksize=chunksize)
+                    completions = thread_map(get_completion, data, max_workers=max_workers, chunksize=chunksize)
                     for d, c in zip(data, completions):
                         d["completion"] = c
                     benchmark.update_database(model.name, data)
