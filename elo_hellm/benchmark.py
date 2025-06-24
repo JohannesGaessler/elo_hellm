@@ -468,16 +468,17 @@ Which of the following moves is the best one for {active_player} to take?
             completion: str = d["completion"]
             pred: int = self.get_prediction(completion)
             move_uci: str = d["moves"][pred]["Move"]
+            move: chess.Move = chess.Move.from_uci(move_uci)
 
             board = chess.Board(d[f"state{turn}"])
-            try:
+            if board.is_legal(move):
                 board.push(chess.Move.from_uci(move_uci))
-            except (AssertionError, chess.InvalidMoveError, chess.IllegalMoveError):
+            else:
                 moves: list[dict] = d["moves"]
                 legal_moves: list[dict] = list(filter(lambda m: not m.get("illegal", False), moves))
                 assert legal_moves
                 legal_moves = sorted(legal_moves, key=BenchmarkChess960.move_to_key)
-                worst_legal_move_uci = legal_moves[-1]["Move"]
+                worst_legal_move_uci: str = legal_moves[-1]["Move"]
                 board.push(chess.Move.from_uci(worst_legal_move_uci))
             state_next: str = board.fen()
 
