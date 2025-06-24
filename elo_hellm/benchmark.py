@@ -11,7 +11,6 @@ from typing import Optional
 import chess
 import datasets
 from stockfish import Stockfish
-from tqdm import tqdm
 
 from elo_hellm.config import Config
 
@@ -395,9 +394,11 @@ class BenchmarkChess960(Benchmark):
         prompt_type: str = data["prompt_type"]
         state: str = data[f"state{turn}"]
 
-        cursor: sqlite3.Cursor = get_db()[1]
+        if not hasattr(local_data, "connection"):
+            local_data.connection = sqlite3.connect(path_db)
+            local_data.cursor = local_data.connection.cursor()
         sql: str = "SELECT moves FROM stockfish_cache WHERE fen=?;"
-        query: list = cursor.execute(sql, [state]).fetchall()
+        query: list = local_data.cursor.execute(sql, [state]).fetchall()
 
         if query:
             assert len(query) == 1
@@ -414,7 +415,8 @@ class BenchmarkChess960(Benchmark):
             print(moves, len(moves))
 
             sql: str = "INSERT INTO stockfish_cache VALUES (?, ?);"
-            cursor.execute(sql, [state, json.dumps(moves)])
+            local_data.cursor.execute(sql, [state, json.dumps(moves)])
+            local_data.connection.commit()
         permutation = [i for i in range(BenchmarkChess960.nchoices)]
         random.seed(123456 + 1000*iex + turn)
         random.shuffle(permutation)
