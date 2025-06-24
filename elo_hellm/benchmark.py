@@ -30,18 +30,6 @@ def get_db() -> tuple[sqlite3.Connection, sqlite3.Cursor]:
     return connection, cursor
 
 
-stockfish = None
-
-
-def get_stockfish():
-    global stockfish
-    if stockfish is None:
-        print("Loading stockfish...")
-        stockfish = Stockfish(path=config.stockfish_path, parameters=dict(
-            Threads=config.stockfish_threads, Hash=config.stockfish_hash, UCI_Chess960="true"))
-    return stockfish
-
-
 datasets_raw: dict = dict()
 
 
@@ -401,8 +389,7 @@ class BenchmarkChess960(Benchmark):
 
     @staticmethod
     def add_message_data(data: dict) -> None:
-        stockfish = get_stockfish()
-
+        local_data = data["local_data"]
         iex: int = data["iex"]
         turn: int = data["turn"]
         prompt_type: str = data["prompt_type"]
@@ -416,9 +403,12 @@ class BenchmarkChess960(Benchmark):
             assert len(query) == 1
             moves: list[dict] = json.loads(query[0][0])
         else:
-            assert stockfish.is_fen_valid(state)
-            stockfish.set_fen_position(state)
-            moves: list[dict] = stockfish.get_top_moves(BenchmarkChess960.nchoices)
+            if not hasattr(local_data, "stockfish"):
+                local_data.stockfish = Stockfish(path=config.stockfish_path, parameters=dict(
+                    Threads=config.stockfish_threads, Hash=config.stockfish_hash, UCI_Chess960="true"))
+            assert local_data.stockfish.is_fen_valid(state)
+            local_data.stockfish.set_fen_position(state)
+            moves: list[dict] = local_data.stockfish.get_top_moves(BenchmarkChess960.nchoices)
             moves = sorted(moves, key=BenchmarkChess960.move_to_key, reverse=True)
             BenchmarkChess960.add_random_moves(moves, iex, turn)
             print(moves, len(moves))

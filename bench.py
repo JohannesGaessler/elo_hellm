@@ -3,7 +3,8 @@
 import json
 import os
 from time import sleep, time
-from typing import Dict, Optional, List
+import threading
+from typing import Optional
 
 import requests
 import subprocess
@@ -18,7 +19,7 @@ TEMPLATE_SERVER_ADDRESS = "http://localhost:{port}"
 config = Config("config.yml")
 
 
-def get_servers(model: Model) -> List[dict]:
+def get_servers(model: Model) -> list[dict]:
     os.makedirs("logs", exist_ok=True)
 
     servers = []
@@ -26,11 +27,11 @@ def get_servers(model: Model) -> List[dict]:
         port = 1337 + i
         address = TEMPLATE_SERVER_ADDRESS.format(port=port)
 
-        env: Dict[str, str] = dict(
+        env: dict[str, str] = dict(
             CUDA_VISIBLE_DEVICES=",".join([str(j) for j in range(i, i+model.gpus_per_server)]),
         )
 
-        popen_args: List[str] = [
+        popen_args: list[str] = [
             config.path_server,
             "--flash-attn",
             "--n-gpu-layers", "999",
@@ -62,7 +63,11 @@ def get_servers(model: Model) -> List[dict]:
     return servers
 
 
+local_data = threading.local()
+
+
 def get_completion(data: dict) -> str:
+    data["local_data"] = local_data
     data["add_message_data"](data)
 
     server_address: str = data["server_address"]
