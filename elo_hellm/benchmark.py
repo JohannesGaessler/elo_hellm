@@ -368,6 +368,8 @@ class BenchmarkChess960(Benchmark):
 
         while len(moves) < BenchmarkChess960.nchoices:
             random_move: str = random.choice(LETTERS) + random.choice(NUMBERS) + random.choice(LETTERS) + random.choice(NUMBERS)
+            if random_move[:2] == random_move[2:]:
+                continue
             for m in moves:
                 if m["Move"] == random_move:
                     continue
