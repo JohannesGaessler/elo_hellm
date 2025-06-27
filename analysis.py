@@ -109,6 +109,7 @@ for dataset in config.datasets:
         plt.xlabel("Model file size [GiB]")
         plt.ylabel("Model winrate vs. benchmark")
         plt.savefig(os.path.join(DIR_OUT, f"{name}-filesize-winrate.png"), dpi=240)
+        plt.close()
 
         for r1 in rows:
             r1[1] = f"{r1[1]:.2f}"
