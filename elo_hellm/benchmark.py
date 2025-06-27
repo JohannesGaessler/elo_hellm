@@ -122,6 +122,10 @@ class Benchmark(ABC):
         cursor.execute(sql)
         connection.commit()
 
+    @staticmethod
+    def n_turns() -> int:
+        return 1
+
     def n_gens(self) -> int:
         if self.prompt_type == "instant":
             return 1
@@ -331,6 +335,10 @@ class BenchmarkChess960(Benchmark):
         sql: str = "CREATE TABLE IF NOT EXISTS stockfish_cache(fen TEXT, moves TEXT NOT NULL, worst_legal_move INTEGER NOT NULL, PRIMARY KEY (fen));"
         cursor.execute(sql)
         connection.commit()
+
+    @staticmethod
+    def n_turns() -> int:
+        return config.chess960_n_halfturns
 
     @staticmethod
     def add_random_moves(moves: list[dict], iex: int, i_gen: int, turn: int) -> None:

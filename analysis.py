@@ -28,8 +28,19 @@ results: dict[tuple[str, str], dict] = dict()
 for model in config.models:
     for ds in model.datasets:
         for prompt_type in model.prompt_types:
-            benchmark = get_benchmark(ds, prompt_type, turn=0)
-            results[(model.name, benchmark.database_name())] = np.array(benchmark.get_results(model.name), dtype=np.int64)
+            labels = []
+            pred = []
+
+            turn: int = 0
+            benchmark = get_benchmark(ds, prompt_type, turn)
+            while turn < benchmark.n_turns():
+                l, p = benchmark.get_results(model.name)
+                labels += l
+                pred += p
+
+                turn += 1
+                benchmark = get_benchmark(ds, prompt_type, turn)
+            results[(model.name, benchmark.database_name())] = np.array([labels, pred], dtype=np.int64)
 
 
 class BenchmarkModelScores:

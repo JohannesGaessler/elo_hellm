@@ -102,8 +102,9 @@ def process_model(model: Model):
     try:
         for ds in model.datasets:
             for prompt_type in model.prompt_types:
-                for turn in range(config.chess960_n_halfturns if ds == "chess960" else 1):
-                    benchmark: Benchmark = get_benchmark(ds, prompt_type, turn)
+                turn: int = 0
+                benchmark: Benchmark = get_benchmark(ds, prompt_type, turn)
+                while turn < benchmark.n_turns():
                     for i_gen in range(benchmark.n_gens()):
                         data = benchmark.get_input_data(model.name, i_gen)
                         if not data:
@@ -121,6 +122,8 @@ def process_model(model: Model):
                             d["completion"] = c
                         benchmark.update_database(model.name, data)
                         print(f"Done: {model.name}, {benchmark.database_name()}, turn={turn}, i_gen={i_gen}, time={time() - t0:.2f}s")
+                    turn += 1
+                    benchmark: Benchmark = get_benchmark(ds, prompt_type, turn)
     finally:
         for server in servers:
             server["process"].terminate()
