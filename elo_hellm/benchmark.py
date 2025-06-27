@@ -478,8 +478,9 @@ Which of the following moves is the best one for {active_player} to take? Hint: 
 
         labels = []
         pred = []
-        for q in query:
+        for i, q in enumerate(query):
             iex: int = q[0]
+            assert iex == i
             permutation = [i for i in range(BenchmarkChess960.nchoices)]
             random.seed(123456 + 1000*iex + self.turn)
             random.shuffle(permutation)
