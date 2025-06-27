@@ -434,9 +434,10 @@ class BenchmarkChess960(Benchmark):
         permutation = [i for i in range(BenchmarkChess960.nchoices)]
         random.seed(123456 + 1000*iex + turn)
         random.shuffle(permutation)
+        moves = [moves[permutation[i]] for i in permutation]
 
         data["label"] = permutation.index(0)
-        data["moves"] = [moves[permutation[i]] for i in permutation]
+        data["moves"] = moves
 
         active_player: str = "White" if turn % 2 == 0 else "Black"
 
