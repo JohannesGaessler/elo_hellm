@@ -6,7 +6,7 @@ model_dir: /opt/models
 num_gpus: 6
 num_workers: 128
 
-chess960_n_halfturns: 10
+chess960_n_halfturns: 4
 
 stockfish_path: /usr/bin/stockfish
 stockfish_threads: 1
