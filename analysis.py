@@ -26,9 +26,9 @@ os.makedirs(DIR_OUT, exist_ok=True)
 
 results: dict[tuple[str, str], dict] = dict()
 for model in config.models:
-    for model_scores in model.datasets:
+    for ds in model.datasets:
         for prompt_type in model.prompt_types:
-            benchmark = get_benchmark(model_scores, prompt_type)
+            benchmark = get_benchmark(ds, prompt_type, turn=0)
             results[(model.name, benchmark.database_name())] = np.array(benchmark.get_results(model.name), dtype=np.int64)
 
 

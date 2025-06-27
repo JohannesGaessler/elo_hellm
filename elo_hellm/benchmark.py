@@ -137,7 +137,7 @@ class Benchmark(ABC):
     def database_types(self) -> list[str]:
         return ["TEXT", "INTEGER", "INTEGER", "INTEGER", "INTEGER"] + ["TEXT"] * self.n_gens()
 
-    def get_input_data(self, model: str, i_gen: int) -> list[dict]:
+    def get_input_data(self, model: str, turn: int, i_gen: int) -> list[dict]:
         data = get_dataset(self.name)
         database_name: str = self.database_name()
         connection, cursor = get_db()
@@ -145,8 +145,8 @@ class Benchmark(ABC):
         assert i_gen < n_gens
 
         if i_gen == 0:
-            sql: str = f"SELECT iex FROM {database_name} WHERE model = ? AND i_gen != ?;"
-            query: list[tuple[int]] = cursor.execute(sql, [model, i_gen]).fetchall()
+            sql: str = f"SELECT iex FROM {database_name} WHERE model = ? AND (turn > ? OR (turn = ? AND i_gen > ?));"
+            query: list[tuple[int]] = cursor.execute(sql, [model, turn, turn, i_gen]).fetchall()
             indices_done: list[int] = [q[0] for q in query]
             data = list(filter(lambda d: d["iex"] not in indices_done, data))
             for dt in data:
@@ -159,8 +159,8 @@ class Benchmark(ABC):
             return data
 
         columns: list[str] = ["iex"] + [f"gen{i}" for i in range(i_gen)]
-        sql: str = f"SELECT {', '.join(columns)} FROM {database_name} WHERE model = ? AND iex < ? AND i_gen = ? ORDER BY iex;"
-        query = cursor.execute(sql, [model, len(data), i_gen]).fetchall()
+        sql: str = f"SELECT {', '.join(columns)} FROM {database_name} WHERE model = ? AND iex < ? AND turn = ? AND i_gen = ? ORDER BY iex;"
+        query = cursor.execute(sql, [model, len(data), turn, i_gen]).fetchall()
 
         data = []
         for q in query:
