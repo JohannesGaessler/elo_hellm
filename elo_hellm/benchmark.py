@@ -326,7 +326,7 @@ class BenchmarkChess960(Benchmark):
         self.score_rng = 1.0 / self.nchoices
 
         connection, cursor = get_db()
-        sql: str = "CREATE TABLE IF NOT EXISTS stockfish_cache(fen TEXT, moves TEXT NOT NULL, PRIMARY KEY (fen));"
+        sql: str = "CREATE TABLE IF NOT EXISTS stockfish_cache(fen TEXT, moves TEXT NOT NULL, worst_legal_move INTEGER NOT NULL, PRIMARY KEY (fen));"
         cursor.execute(sql)
         connection.commit()
 
@@ -390,11 +390,17 @@ class BenchmarkChess960(Benchmark):
 
             for i in range(turn):
                 state: str = local_data.stockfish.get_fen_position()
-                sql: str = "SELECT moves FROM stockfish_cache WHERE fen=?;"
+                sql: str = "SELECT moves, worst_legal_move FROM stockfish_cache WHERE fen=?;"
                 query: list = local_data.cursor.execute(sql, [state]).fetchall()
                 assert len(query) == 1
                 moves: list[dict] = json.loads(query[0][0])
-                local_data.stockfish.make_moves_from_current_position([moves[preds[i]]["Move"]])
+                move_uci: str = moves[preds[i]]["Move"]
+                worst_legal_move_uci: int = query[0][1]
+
+                if chess.Board(state).is_legal(chess.Move.from_uci(move_uci)):
+                    local_data.stockfish.make_moves_from_current_position([move_uci])
+                else:
+                    local_data.stockfish.make_moves_from_current_position([worst_legal_move_uci])
 
         state: str = local_data.stockfish.get_fen_position()
         sql: str = "SELECT moves FROM stockfish_cache WHERE fen=?;"
@@ -403,14 +409,17 @@ class BenchmarkChess960(Benchmark):
         if query:
             assert len(query) == 1
             moves: list[dict] = json.loads(query[0][0])
+            worst_legal_move: int = query[0][1]
         else:
             moves: list[dict] = local_data.stockfish.get_top_moves(BenchmarkChess960.nchoices)
             moves = sorted(moves, key=BenchmarkChess960.move_to_key, reverse=True)
+            worst_legal_move: int = len(moves) - 1
             BenchmarkChess960.add_random_moves(moves, iex, i_gen, turn)
 
-            sql: str = "INSERT INTO stockfish_cache VALUES (?, ?);"
-            local_data.cursor.execute(sql, [state, json.dumps(moves)])
+            sql: str = "INSERT INTO stockfish_cache VALUES (?, ?, ?);"
+            local_data.cursor.execute(sql, [state, json.dumps(moves), worst_legal_move])
             local_data.connection.commit()
+
         permutation = [i for i in range(BenchmarkChess960.nchoices)]
         random.seed(123456 + 1000*iex + turn)
         random.shuffle(permutation)
@@ -444,38 +453,6 @@ Which of the following moves is the best one for {active_player} to take?
     @staticmethod
     def get_prediction(completion: str) -> int:
         return LETTERS.index(completion[:1])
-
-    def update_database(self, model: str, data: list[dict]):
-        connection, cursor = get_db()
-        name: str = self.database_name()
-        for d in data:
-            turn: int = d["turn"]
-            completion: str = d["completion"]
-            pred: int = self.get_prediction(completion)
-            move_uci: str = d["moves"][pred]["Move"]
-            move: chess.Move = chess.Move.from_uci(move_uci)
-
-            board = chess.Board(d[f"state{turn}"])
-            if board.is_legal(move):
-                board.push(chess.Move.from_uci(move_uci))
-            else:
-                moves: list[dict] = d["moves"]
-                legal_moves: list[dict] = list(filter(lambda m: not m.get("illegal", False), moves))
-                assert legal_moves
-                legal_moves = sorted(legal_moves, key=BenchmarkChess960.move_to_key)
-                worst_legal_move_uci: str = legal_moves[-1]["Move"]
-                board.push(chess.Move.from_uci(worst_legal_move_uci))
-            state_next: str = board.fen()
-
-            if turn == 0:
-                values: list[str] = [model, str(d["iex"]), str(turn + 1), d["label"], completion, str(pred), state_next]
-                sql: str = f"INSERT INTO {name} (model, iex, turn, label0, gen0, pred0, state1) VALUES ({', '.join(['?']*len(values))});"
-                cursor.execute(sql, values)
-            else:
-                sql: str = (f"UPDATE {name} SET turn=?, label{turn}=?, gen{turn}=?, pred{turn}=?, state{turn + 1}=? "
-                    "WHERE model=? AND iex=?;")
-                cursor.execute(sql, [turn + 1, d["label"], completion, pred, state_next, model, d["iex"]])
-        connection.commit()
 
     def get_results(self, model: str):
         cursor: sqlite3.Cursor = get_db()[1]
