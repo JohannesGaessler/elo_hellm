@@ -383,9 +383,9 @@ class BenchmarkChess960(Benchmark):
         local_data.stockfish.set_fen_position(state0)
 
         if turn > 0:
-            sql: str = f"SELECT pred FROM {database_name} WHERE turn < ? ORDER BY turn;"
-            query: list = local_data.cursor.execute(sql, [turn]).fetchall()
-            assert len(query) == turn
+            sql: str = f"SELECT pred FROM {database_name} WHERE iex = ? AND turn < ? ORDER BY turn;"
+            query: list = local_data.cursor.execute(sql, [iex, turn]).fetchall()
+            assert len(query) == turn, f"len(query)={len(query)} turn={turn}"
             preds: list[int] = [q[0] for q in query]
 
             for i in range(turn):
