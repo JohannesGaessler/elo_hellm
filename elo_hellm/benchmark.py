@@ -492,10 +492,8 @@ def get_benchmark(dataset: str, prompt_type: str, turn: int) -> Benchmark:
     key: tuple = (dataset, prompt_type, turn)
     if key not in benchmarks:
         if dataset in ["gsm8k_test"]:
-            assert turn == 0
             benchmark = BenchmarkMath(dataset, prompt_type)
         elif dataset in ["gpqa_main", "mmlu_test", "mmlu_pro_test"]:
-            assert turn == 0
             benchmark = BenchmarkMultipleChoice(dataset, prompt_type)
         elif dataset == "chess960":
             benchmark = BenchmarkChess960(prompt_type, turn)
