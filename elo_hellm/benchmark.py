@@ -403,7 +403,7 @@ class BenchmarkChess960(Benchmark):
                 state: str = local_data.stockfish.get_fen_position()
                 sql: str = "SELECT moves, worst_legal_move FROM stockfish_cache WHERE fen=?;"
                 query: list = local_data.cursor.execute(sql, [state]).fetchall()
-                assert len(query) == 1, f"preds={preds} i={i} len(query)={len(query)}"
+                assert len(query) == 1, f"iex={iex} preds={preds} i={i} len(query)={len(query)}"
                 moves: list[dict] = json.loads(query[0][0])
                 move_uci: str = moves[preds[i]]["Move"]
                 worst_legal_move_uci: int = query[0][1]
