@@ -378,6 +378,8 @@ class BenchmarkChess960(Benchmark):
         if not hasattr(local_data, "connection"):
             local_data.connection = sqlite3.connect(path_db)
             local_data.cursor = local_data.connection.cursor()
+
+        assert local_data.stockfish.is_fen_valid(state0)
         local_data.stockfish.set_fen_position(state0)
 
         if turn > 0:
