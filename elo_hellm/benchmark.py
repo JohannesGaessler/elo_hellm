@@ -106,16 +106,15 @@ def get_dataset(name: str) -> list[dict]:
 class Benchmark(ABC):
     name: str
     prompt_type: str
-    has_state: bool
+    turn: int
     npredict_last: int
     score_rng: float
 
-    def __init__(self, name: str, prompt_type: str, has_state: bool):
+    def __init__(self, name: str, prompt_type: str, turn: int):
         self.name = name
         assert prompt_type in ["normal", "instant"]
         self.prompt_type = prompt_type
-        assert type(has_state) is bool
-        self.has_state = has_state
+        self.turn = turn
 
         connection, cursor = get_db()
         columns_types: list[str] = [f"{c} {t}" for (c, t) in zip(self.database_columns(), self.database_types())]
@@ -123,7 +122,7 @@ class Benchmark(ABC):
         cursor.execute(sql)
         connection.commit()
 
-    def nturns(self) -> int:
+    def n_gens(self) -> int:
         if self.prompt_type == "instant":
             return 1
         if self.prompt_type == "normal":
@@ -133,50 +132,51 @@ class Benchmark(ABC):
         return f"{self.name}_{self.prompt_type}"
 
     def database_columns(self) -> list[str]:
-        return ["model", "iex", "pred", "turn"] + [f"gen{i}" for i in range(self.nturns())]
+        return ["model", "iex", "pred", "turn", "i_gen"] + [f"gen{i}" for i in range(self.ngens())]
 
     def database_types(self) -> list[str]:
-        return ["TEXT", "INTEGER", "INTEGER", "INTEGER"] + ["TEXT"] * self.nturns()
+        return ["TEXT", "INTEGER", "INTEGER", "INTEGER", "INTEGER"] + ["TEXT"] * self.ngens()
 
-    def get_input_data(self, model: str, turn: int) -> list[dict]:
+    def get_input_data(self, model: str, i_gen: int) -> list[dict]:
         data = get_dataset(self.name)
+        database_name: str = self.database_name
         connection, cursor = get_db()
-        nturns: int = self.nturns()
+        n_gens: int = self.n_gens()
+        assert i_gen < n_gens
 
-        if turn == 0:
-            sql: str = f"SELECT iex FROM {self.database_name()} WHERE model = ? AND turn != ?;"
-            query: list[tuple[int]] = cursor.execute(sql, [model, turn]).fetchall()
+        if i_gen == 0:
+            sql: str = f"SELECT iex FROM {database_name} WHERE model = ? AND i_gen != ?;"
+            query: list[tuple[int]] = cursor.execute(sql, [model, i_gen]).fetchall()
             indices_done: list[int] = [q[0] for q in query]
-            data_turn = list(filter(lambda d: d["iex"] not in indices_done, data))
-            for dt in data_turn:
-                dt["turn"] = turn
+            data = list(filter(lambda d: d["iex"] not in indices_done, data))
+            for dt in data:
+                dt["turn"] = self.turn
+                dt["i_gen"] = i_gen
+                dt["database_name"] = database_name
                 dt["prompt_type"] = self.prompt_type
-                dt["npredict"] = self.npredict_last if self.has_state or turn + 1 == nturns else 2048  # FIXME
+                dt["npredict"] = self.npredict_last if i_gen + 1 == n_gens else 2048  # FIXME
                 dt["add_message_data"] = self.add_message_data
-            return data_turn
+            return data
 
-        columns: list[str] = ["iex"] + [f"gen{i}" for i in range(turn)]
-        if self.has_state:
-            columns += [f"state{i}" for i in range(1, turn + 1)]
-        sql: str = f"SELECT {', '.join(columns)} FROM {self.database_name()} WHERE model = ? AND iex < ? AND turn = ? ORDER BY iex;"
-        query = cursor.execute(sql, [model, len(data), turn]).fetchall()
+        columns: list[str] = ["iex"] + [f"gen{i}" for i in range(i_gen)]
+        sql: str = f"SELECT {', '.join(columns)} FROM {database_name} WHERE model = ? AND iex < ? AND i_gen = ? ORDER BY iex;"
+        query = cursor.execute(sql, [model, len(data), i_gen]).fetchall()
 
-        data_turn = []
+        data = []
         for q in query:
             iex: int = q[0]
             dti: dict = data[iex]
-            for i in range(turn):
+            for i in range(i_gen):
                 dti[f"gen{i}"] = q[1 + i]
-            if self.has_state:
-                for i in range(1, turn + 1):
-                    dti[f"state{i}"] = q[1 + turn + i - 1]
-            data_turn.append(dti)
-        for dt in data_turn:
-            dt["turn"] = turn
+            data.append(dti)
+        for dt in data:
+            dt["turn"] = self.turn
+            dt["i_gen"] = i_gen
+            dt["database_name"] = database_name
             dt["prompt_type"] = self.prompt_type
-            dt["npredict"] = self.npredict_last if self.has_state or turn + 1 == nturns else 2048  # FIXME
+            dt["npredict"] = self.npredict_last if i_gen + 1 == n_gens else 2048  # FIXME
             dt["add_message_data"] = self.add_message_data
-        return data_turn
+        return data
 
     @staticmethod
     @abstractmethod
@@ -191,29 +191,29 @@ class Benchmark(ABC):
     def update_database(self, model: str, data: list[dict]):
         connection, cursor = get_db()
         name: str = self.database_name()
-        nturns: int = self.nturns()
+        n_gens: int = self.n_gens()
         for d in data:
-            turn: int = d["turn"]
+            i_gen: int = d["i_gen"]
             completion: str = d["completion"]
-            pred: str = "NULL" if turn + 1 < nturns else str(self.get_prediction(completion))
+            pred: str = "NULL" if i_gen + 1 < n_gens else str(self.get_prediction(completion))
 
-            if turn == 0:
-                values: list[str] = [model, str(d["iex"]), pred, str(turn + 1), completion]
-                sql: str = f"INSERT INTO {name} (model, iex, pred, turn, gen0) VALUES ({', '.join(['?']*len(values))});"
+            if i_gen == 0:
+                values: list[str] = [model, str(d["iex"]), pred, str(i_gen + 1), completion]
+                sql: str = f"INSERT INTO {name} (model, iex, pred, i_gen, gen0) VALUES ({', '.join(['?']*len(values))});"
                 cursor.execute(sql, values)
             else:
-                sql: str = (f"UPDATE {name} SET pred=?, turn=?, gen{turn}=? WHERE model=? AND iex=?;")
-                cursor.execute(sql, [pred, turn + 1, completion, model, d["iex"]])
+                sql: str = (f"UPDATE {name} SET pred=?, i_gen=?, gen{i_gen}=? WHERE model=? AND iex=?;")
+                cursor.execute(sql, [pred, i_gen + 1, completion, model, d["iex"]])
         connection.commit()
 
     def get_results(self, model: str):
         cursor: sqlite3.Cursor = get_db()[1]
 
-        nturns: int = self.nturns()
-        data: list[dict] = self.get_input_data(model, nturns)
+        n_gens: int = self.n_gens()
+        data: list[dict] = self.get_input_data(model, n_gens)
         sql: str = (f"SELECT iex, pred FROM {self.database_name()} "
-            f"WHERE model = ? AND iex < ? AND turn = ? ORDER BY iex;")
-        query = cursor.execute(sql, [model, len(data), nturns])
+            f"WHERE model = ? AND iex < ? AND i_gen = ? ORDER BY iex;")
+        query = cursor.execute(sql, [model, len(data), n_gens])
         labels = []
         pred = []
         for q in query:
@@ -229,7 +229,7 @@ class BenchmarkMultipleChoice(Benchmark):
     nchoices: int
 
     def __init__(self, name: str, prompt_type: str):
-        super().__init__(name, prompt_type, has_state=False)
+        super().__init__(name, prompt_type, turn=0)
         self.npredict_last = 1
         if name == "gpqa_main":
             self.nchoices = 5
@@ -243,7 +243,7 @@ class BenchmarkMultipleChoice(Benchmark):
 
     @staticmethod
     def add_message_data(data: dict) -> None:
-        turn: int = data["turn"]
+        i_gen: int = data["i_gen"]
         prompt_type: str = data["prompt_type"]
 
         messages: list[dict] = []
@@ -260,14 +260,11 @@ Which of the following answers is correct?
         if prompt_type == "instant":
             prompt_suffix: str = "The correct answer is ("
             grammar = f"root ::= [{''.join(LETTERS[:len(choices)])}]"
-        elif prompt_type == "normal":
-            if turn == 0:
-                pass
-            elif turn == 1:
-                messages.append(dict(role="assistant", content=data["gen0"]))
-                messages.append(dict(role="user", content="Please enter your final answer."))
-                prompt_suffix: str = "My final answer is ("
-                grammar = f"root ::= [{''.join(LETTERS[:len(choices)])}]"
+        elif prompt_type == "normal" and i_gen == 1:
+            messages.append(dict(role="assistant", content=data["gen0"]))
+            messages.append(dict(role="user", content="Please enter your final answer."))
+            prompt_suffix: str = "My final answer is ("
+            grammar = f"root ::= [{''.join(LETTERS[:len(choices)])}]"
         data["messages"] = messages
         data["prompt_suffix"] = prompt_suffix
         data["grammar"] = grammar
@@ -279,13 +276,13 @@ Which of the following answers is correct?
 
 class BenchmarkMath(Benchmark):
     def __init__(self, name: str, prompt_type: str):
-        super().__init__(name, prompt_type, has_state=False)
+        super().__init__(name, prompt_type, turn=0)
         self.npredict_last = 10
         self.score_rng = 0.0
 
     @staticmethod
     def add_message_data(data: dict) -> None:
-        turn: int = data["turn"]
+        i_gen: int = data["i_gen"]
         prompt_type: str = data["prompt_type"]
 
         messages: list[dict] = []
@@ -297,14 +294,11 @@ class BenchmarkMath(Benchmark):
         if prompt_type == "instant":
             prompt_suffix: str = "The correct answer is "
             grammar = "root ::= [0-9]+.*"
-        elif prompt_type == "normal":
-            if turn == 0:
-                pass
-            elif turn == 1:
-                messages.append(dict(role="assistant", content=data["gen0"]))
-                messages.append(dict(role="user", content="Please enter your final answer."))
-                prompt_suffix: str = "My final answer is "
-                grammar = "root ::= [0-9]+.*"
+        elif prompt_type == "normal" and i_gen == 1:
+            messages.append(dict(role="assistant", content=data["gen0"]))
+            messages.append(dict(role="user", content="Please enter your final answer."))
+            prompt_suffix: str = "My final answer is "
+            grammar = "root ::= [0-9]+.*"
         data["messages"] = messages
         data["prompt_suffix"] = prompt_suffix
         data["grammar"] = grammar
@@ -325,10 +319,9 @@ class BenchmarkMath(Benchmark):
 
 class BenchmarkChess960(Benchmark):
     nchoices: int = 10
-    nturns_chess: int = 10
 
-    def __init__(self, prompt_type: str):
-        super().__init__("chess960", prompt_type, has_state=True)
+    def __init__(self, prompt_type: str, turn: int):
+        super().__init__("chess960", prompt_type, turn)
         self.npredict_last = 1
         self.score_rng = 1.0 / self.nchoices
 
@@ -337,31 +330,12 @@ class BenchmarkChess960(Benchmark):
         cursor.execute(sql)
         connection.commit()
 
-    def nturns(self) -> int:
-        if self.prompt_type == "instant":
-            return self.nturns_chess * 2
-        elif self.prompt_type == "normal":
-            return self.nturns_chess * 4
-        else:
-            assert False
-
-    def database_columns(self) -> list[str]:
-        nturns: int = self.nturns()
-
-        ret: list[str] = ["model", "iex", "turn"]
-        for i in range(nturns):
-            ret += [f"label{i}", f"gen{i}", f"pred{i}", f"state{i + 1}"]
-        return ret
-
-    def database_types(self) -> list[str]:
-        return ["TEXT", "INTEGER", "INTEGER"] + ["TEXT", "INTEGER", "INTEGER", "TEXT"] * self.nturns()
-
     @staticmethod
-    def add_random_moves(moves: list[dict], iex: int, turn: int) -> None:
+    def add_random_moves(moves: list[dict], iex: int, i_gen: int, turn: int) -> None:
         assert len(moves) <= BenchmarkChess960.nchoices
         if len(moves) == BenchmarkChess960.nchoices:
             return
-        random.seed(1234567 + 1000*iex + turn)
+        random.seed(12345678 + 10000*iex + 10*turn + i_gen)
 
         LETTERS = ["a", "b", "c", "d", "e", "f", "g", "h"]
         NUMBERS = ["1", "2", "3", "4", "5", "6", "7", "8"]
@@ -392,13 +366,35 @@ class BenchmarkChess960(Benchmark):
     def add_message_data(data: dict) -> None:
         local_data = data["local_data"]
         iex: int = data["iex"]
+        i_gen: int = data["i_gen"]
         turn: int = data["turn"]
+        database_name: str = data["database_name"]
         prompt_type: str = data["prompt_type"]
-        state: str = data[f"state{turn}"]
+        state0: str = data["state0"]
 
+        if not hasattr(local_data, "stockfish"):
+            local_data.stockfish = Stockfish(path=config.stockfish_path, parameters=dict(
+                Threads=config.stockfish_threads, Hash=config.stockfish_hash, UCI_Chess960="true"))
         if not hasattr(local_data, "connection"):
             local_data.connection = sqlite3.connect(path_db)
             local_data.cursor = local_data.connection.cursor()
+        local_data.stockfish.set_fen_position(state0)
+
+        if turn > 0:
+            sql: str = f"SELECT pred FROM {database_name} WHERE turn < ? ORDER BY turn;"
+            query: list = local_data.cursor.execute(sql, [turn]).fetchall()
+            assert len(query) == turn
+            preds: list[int] = [q[0] for q in query]
+
+            for i in range(turn):
+                state: str = local_data.stockfish.get_fen_position()
+                sql: str = "SELECT moves FROM stockfish_cache WHERE fen=?;"
+                query: list = local_data.cursor.execute(sql, [state]).fetchall()
+                assert len(query) == 1
+                moves: list[dict] = json.loads(query[0][0])
+                local_data.stockfish.make_moves_from_current_position([moves[preds[i]]["Move"]])
+
+        state: str = local_data.stockfish.get_fen_position()
         sql: str = "SELECT moves FROM stockfish_cache WHERE fen=?;"
         query: list = local_data.cursor.execute(sql, [state]).fetchall()
 
@@ -406,9 +402,6 @@ class BenchmarkChess960(Benchmark):
             assert len(query) == 1
             moves: list[dict] = json.loads(query[0][0])
         else:
-            if not hasattr(local_data, "stockfish"):
-                local_data.stockfish = Stockfish(path=config.stockfish_path, parameters=dict(
-                    Threads=config.stockfish_threads, Hash=config.stockfish_hash, UCI_Chess960="true"))
             assert local_data.stockfish.is_fen_valid(state)
             local_data.stockfish.set_fen_position(state)
             moves: list[dict] = local_data.stockfish.get_top_moves(BenchmarkChess960.nchoices)
@@ -440,7 +433,7 @@ class BenchmarkChess960(Benchmark):
 Which of the following moves is the best one for {active_player} to take?
 {choices_block}"""))
 
-        assert prompt_type == "instant"
+        assert i_gen == 0 and prompt_type == "instant"
         prompt_suffix: str = f"The best move for {active_player} to take is ("
         grammar = f"root ::= [{''.join(LETTERS[:len(choices)])}]"
 
@@ -505,15 +498,18 @@ Which of the following moves is the best one for {active_player} to take?
 benchmarks: dict[tuple[str, str], Benchmark] = dict()
 
 
-def get_benchmark(dataset: str, prompt_type: str) -> Benchmark:
-    if (dataset, prompt_type) not in benchmarks:
+def get_benchmark(dataset: str, prompt_type: str, turn: int) -> Benchmark:
+    key: tuple = (dataset, prompt_type, turn)
+    if key not in benchmarks:
         if dataset in ["gsm8k_test"]:
+            assert turn == 0
             benchmark = BenchmarkMath(dataset, prompt_type)
         elif dataset in ["gpqa_main", "mmlu_test", "mmlu_pro_test"]:
+            assert turn == 0
             benchmark = BenchmarkMultipleChoice(dataset, prompt_type)
         elif dataset == "chess960":
-            benchmark = BenchmarkChess960(prompt_type)
+            benchmark = BenchmarkChess960(prompt_type, turn)
         else:
             assert False
-        benchmarks[(dataset, prompt_type)] = benchmark
-    return benchmarks[(dataset, prompt_type)]
+        benchmarks[key] = benchmark
+    return benchmarks[key]

@@ -102,26 +102,27 @@ def process_model(model: Model):
     try:
         for ds in model.datasets:
             for prompt_type in model.prompt_types:
-                benchmark: Benchmark = get_benchmark(ds, prompt_type)
-                for turn in range(benchmark.nturns()):
-                    data = benchmark.get_input_data(model.name, turn)
-                    if not data:
-                        continue
-                    if not servers:
-                        servers = get_servers(model)
-                    for i, di in enumerate(data):
-                        di["server_address"] = servers[i % len(servers)]["address"]
+                for turn in range(config.chess960_n_halfturns if ds == "chess960" else 1):
+                    benchmark: Benchmark = get_benchmark(ds, prompt_type, turn)
+                    for i_gen in range(benchmark.n_gens()):
+                        data = benchmark.get_input_data(model.name, i_gen)
+                        if not data:
+                            continue
+                        if not servers:
+                            servers = get_servers(model)
+                        for i, di in enumerate(data):
+                            di["server_address"] = servers[i % len(servers)]["address"]
 
-                    t0 = time()
-                    print(f"Start: {model.name}, {benchmark.database_name()}, turn={turn}")
-                    max_workers: int = 2 * len(servers) * model.parallel
-                    chunksize: int = 1
-                    completions = thread_map(get_completion, data, max_workers=max_workers, chunksize=chunksize)
-                    # Database now potentially has uncommitted changes, will be fixed committed with update_database.
-                    for d, c in zip(data, completions):
-                        d["completion"] = c
-                    benchmark.update_database(model.name, data)
-                    print(f"Done: {model.name}, {benchmark.database_name()}, turn={turn}, time={time() - t0:.2f}s")
+                        t0 = time()
+                        print(f"Start: {model.name}, {benchmark.database_name()}, turn={turn}, i_gen={i_gen}")
+                        max_workers: int = 2 * len(servers) * model.parallel
+                        chunksize: int = 1
+                        completions = thread_map(get_completion, data, max_workers=max_workers, chunksize=chunksize)
+                        # Database now potentially has uncommitted changes, will be fixed committed with update_database.
+                        for d, c in zip(data, completions):
+                            d["completion"] = c
+                        benchmark.update_database(model.name, data)
+                        print(f"Done: {model.name}, {benchmark.database_name()}, turn={turn}, i_gen={i_gen}, time={time() - t0:.2f}s")
     finally:
         for server in servers:
             server["process"].terminate()
