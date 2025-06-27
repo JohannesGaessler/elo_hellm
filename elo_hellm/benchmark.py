@@ -24,7 +24,7 @@ cursor: sqlite3.Cursor = None
 def get_db() -> tuple[sqlite3.Connection, sqlite3.Cursor]:
     global connection, cursor
     if cursor is None:
-        connection = sqlite3.connect(path_db)
+        connection = sqlite3.connect(path_db, timeout=999999)
         cursor = connection.cursor()
     return connection, cursor
 
@@ -387,7 +387,7 @@ class BenchmarkChess960(Benchmark):
             local_data.stockfish = Stockfish(path=config.stockfish_path, parameters=dict(
                 Threads=config.stockfish_threads, Hash=config.stockfish_hash, UCI_Chess960="true"))
         if not hasattr(local_data, "connection"):
-            local_data.connection = sqlite3.connect(path_db)
+            local_data.connection = sqlite3.connect(path_db, timeout=999999)
             local_data.cursor = local_data.connection.cursor()
 
         assert local_data.stockfish.is_fen_valid(state0)
