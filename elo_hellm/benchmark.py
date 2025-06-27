@@ -409,7 +409,6 @@ class BenchmarkChess960(Benchmark):
         if query:
             assert len(query) == 1
             moves: list[dict] = json.loads(query[0][0])
-            worst_legal_move: int = query[0][1]
         else:
             moves: list[dict] = local_data.stockfish.get_top_moves(BenchmarkChess960.nchoices)
             moves = sorted(moves, key=BenchmarkChess960.move_to_key, reverse=True)
