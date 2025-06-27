@@ -462,8 +462,8 @@ Which of the following moves is the best one for {active_player} to take?
         n_gens: int = self.n_gens()
         data: list[dict] = self.get_input_data(model, n_gens)
         sql: str = (f"SELECT iex, pred FROM {self.database_name()} "
-            "WHERE model = ? AND iex < ? AND i_gen = ? ORDER BY iex, turn;")
-        query = cursor.execute(sql, [model, len(data), n_gens])
+            "WHERE model = ? AND iex < ? AND turn = ? AND i_gen = ? ORDER BY iex, turn;")
+        query = cursor.execute(sql, [model, len(data), self.turn, n_gens])
 
         labels = []
         pred = []
