@@ -105,7 +105,7 @@ def process_model(model: Model):
                 for turn in range(config.chess960_n_halfturns if ds == "chess960" else 1):
                     benchmark: Benchmark = get_benchmark(ds, prompt_type, turn)
                     for i_gen in range(benchmark.n_gens()):
-                        data = benchmark.get_input_data(model.name, turn, i_gen)
+                        data = benchmark.get_input_data(model.name, i_gen)
                         if not data:
                             continue
                         if not servers:

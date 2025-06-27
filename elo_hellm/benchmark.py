@@ -137,7 +137,7 @@ class Benchmark(ABC):
     def database_types(self) -> list[str]:
         return ["TEXT", "INTEGER", "INTEGER", "INTEGER", "INTEGER"] + ["TEXT"] * self.n_gens()
 
-    def get_input_data(self, model: str, turn: int, i_gen: int) -> list[dict]:
+    def get_input_data(self, model: str, i_gen: int) -> list[dict]:
         data = get_dataset(self.name)
         database_name: str = self.database_name()
         connection, cursor = get_db()
@@ -146,7 +146,7 @@ class Benchmark(ABC):
 
         if i_gen == 0:
             sql: str = f"SELECT iex FROM {database_name} WHERE model = ? AND (turn > ? OR (turn = ? AND i_gen > ?));"
-            query: list[tuple[int]] = cursor.execute(sql, [model, turn, turn, i_gen]).fetchall()
+            query: list[tuple[int]] = cursor.execute(sql, [model, self.turn, self.turn, i_gen]).fetchall()
             indices_done: list[int] = [q[0] for q in query]
             data = list(filter(lambda d: d["iex"] not in indices_done, data))
             for dt in data:
@@ -160,7 +160,7 @@ class Benchmark(ABC):
 
         columns: list[str] = ["iex"] + [f"gen{i}" for i in range(i_gen)]
         sql: str = f"SELECT {', '.join(columns)} FROM {database_name} WHERE model = ? AND iex < ? AND turn = ? AND i_gen = ? ORDER BY iex;"
-        query = cursor.execute(sql, [model, len(data), turn, i_gen]).fetchall()
+        query = cursor.execute(sql, [model, len(data), self.turn, i_gen]).fetchall()
 
         data = []
         for q in query:
@@ -210,7 +210,7 @@ class Benchmark(ABC):
         cursor: sqlite3.Cursor = get_db()[1]
 
         n_gens: int = self.n_gens()
-        data: list[dict] = self.get_input_data(model, 0, n_gens)
+        data: list[dict] = self.get_input_data(model, n_gens)
         sql: str = (f"SELECT iex, pred FROM {self.database_name()} "
             f"WHERE model = ? AND iex < ? AND i_gen = ? ORDER BY iex;")
         query = cursor.execute(sql, [model, len(data), n_gens])
@@ -456,9 +456,8 @@ Which of the following moves is the best one for {active_player} to take?
     def get_results(self, model: str):
         cursor: sqlite3.Cursor = get_db()[1]
 
-        turn: int = 0  # FIXME
         n_gens: int = self.n_gens()
-        data: list[dict] = self.get_input_data(model, turn, n_gens)
+        data: list[dict] = self.get_input_data(model, self.turn, n_gens)
         sql: str = (f"SELECT iex, pred FROM {self.database_name()} "
             "WHERE model = ? AND iex < ? AND i_gen = ? ORDER BY iex, turn;")
         query = cursor.execute(sql, [model, len(data), n_gens])
@@ -468,7 +467,7 @@ Which of the following moves is the best one for {active_player} to take?
         for q in query:
             iex: int = q[0]
             permutation = [i for i in range(BenchmarkChess960.nchoices)]
-            random.seed(123456 + 1000*iex + turn)
+            random.seed(123456 + 1000*iex + self.turn)
             random.shuffle(permutation)
             labels.append(permutation.index(0))  # TODO deduplicate
             pred.append(q[1])
