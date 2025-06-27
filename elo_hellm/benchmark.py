@@ -210,7 +210,7 @@ class Benchmark(ABC):
         cursor: sqlite3.Cursor = get_db()[1]
 
         n_gens: int = self.n_gens()
-        data: list[dict] = self.get_input_data(model, n_gens)
+        data: list[dict] = self.get_input_data(model, 0, n_gens)
         sql: str = (f"SELECT iex, pred FROM {self.database_name()} "
             f"WHERE model = ? AND iex < ? AND i_gen = ? ORDER BY iex;")
         query = cursor.execute(sql, [model, len(data), n_gens])
@@ -456,18 +456,16 @@ Which of the following moves is the best one for {active_player} to take?
     def get_results(self, model: str):
         cursor: sqlite3.Cursor = get_db()[1]
 
-        nturns: int = self.nturns()
-        data: list[dict] = self.get_input_data(model, nturns)
-        labels_preds: list[str] = [f"label{i}, pred{i}" for i in range(nturns)]
-        sql: str = (f"SELECT {', '.join(labels_preds)} FROM {self.database_name()} "
-            f"WHERE model = ? AND iex < ? AND turn = ? ORDER BY iex;")
-        query = cursor.execute(sql, [model, len(data), nturns])
+        n_gens: int = self.n_gens()
+        data: list[dict] = self.get_input_data(model, 0, n_gens)
+        sql: str = (f"SELECT label, pred FROM {self.database_name()} "
+            "WHERE model = ? AND iex < ? AND i_gen = ? ORDER BY iex;")
+        query = cursor.execute(sql, [model, len(data), n_gens])
         labels = []
         pred = []
         for q in query:
-            for i in range(nturns):
-                labels.append(q[2*i + 0])
-                pred.append(q[2*i + 1])
+            labels.append(q[0])
+            pred.append(q[1])
         return labels, pred
 
 
