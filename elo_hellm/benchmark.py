@@ -456,15 +456,21 @@ Which of the following moves is the best one for {active_player} to take?
     def get_results(self, model: str):
         cursor: sqlite3.Cursor = get_db()[1]
 
+        turn: int = 0  # FIXME
         n_gens: int = self.n_gens()
-        data: list[dict] = self.get_input_data(model, 0, n_gens)
-        sql: str = (f"SELECT label, pred FROM {self.database_name()} "
-            "WHERE model = ? AND iex < ? AND i_gen = ? ORDER BY iex;")
+        data: list[dict] = self.get_input_data(model, turn, n_gens)
+        sql: str = (f"SELECT iex, pred FROM {self.database_name()} "
+            "WHERE model = ? AND iex < ? AND i_gen = ? ORDER BY iex, turn;")
         query = cursor.execute(sql, [model, len(data), n_gens])
+
         labels = []
         pred = []
         for q in query:
-            labels.append(q[0])
+            iex: int = q[0]
+            permutation = [i for i in range(BenchmarkChess960.nchoices)]
+            random.seed(123456 + 1000*iex + turn)
+            random.shuffle(permutation)
+            labels.append(permutation.index(0))  # TODO deduplicate
             pred.append(q[1])
         return labels, pred
 
