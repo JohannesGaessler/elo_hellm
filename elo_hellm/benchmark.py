@@ -138,7 +138,7 @@ class Benchmark(ABC):
         return ["TEXT", "INTEGER", "INTEGER", "INTEGER", "INTEGER"] + ["TEXT"] * self.n_gens()
 
     def get_input_data(self, model: str, i_gen: int) -> list[dict]:
-        data = get_dataset(self.name)
+        data_0 = get_dataset(self.name)
         database_name: str = self.database_name()
         connection, cursor = get_db()
         n_gens: int = self.n_gens()
@@ -148,7 +148,7 @@ class Benchmark(ABC):
             sql: str = f"SELECT iex FROM {database_name} WHERE model = ? AND (turn > ? OR (turn = ? AND i_gen > ?));"
             query: list[tuple[int]] = cursor.execute(sql, [model, self.turn, self.turn, i_gen]).fetchall()
             indices_done: list[int] = [q[0] for q in query]
-            data = list(filter(lambda d: d["iex"] not in indices_done, data))
+            data = list(filter(lambda d: d["iex"] not in indices_done, data_0))
             for dt in data:
                 dt["turn"] = self.turn
                 dt["i_gen"] = i_gen
@@ -160,12 +160,12 @@ class Benchmark(ABC):
 
         columns: list[str] = ["iex"] + [f"gen{i}" for i in range(i_gen)]
         sql: str = f"SELECT {', '.join(columns)} FROM {database_name} WHERE model = ? AND iex < ? AND turn = ? AND i_gen = ? ORDER BY iex;"
-        query = cursor.execute(sql, [model, len(data), self.turn, i_gen]).fetchall()
+        query = cursor.execute(sql, [model, len(data_0), self.turn, i_gen]).fetchall()
 
         data = []
         for q in query:
             iex: int = q[0]
-            dti: dict = data[iex]
+            dti: dict = data_0[iex]
             for i in range(i_gen):
                 dti[f"gen{i}"] = q[1 + i]
             data.append(dti)
@@ -198,8 +198,8 @@ class Benchmark(ABC):
             pred: str = "NULL" if i_gen + 1 < n_gens else str(self.get_prediction(completion))
 
             if i_gen == 0:
-                values: list[str] = [model, str(d["iex"]), pred, str(i_gen + 1), completion]
-                sql: str = f"INSERT INTO {name} (model, iex, pred, i_gen, gen0) VALUES ({', '.join(['?']*len(values))});"
+                values: list[str] = [model, str(d["iex"]), pred, str(self.turn), str(i_gen + 1), completion]
+                sql: str = f"INSERT INTO {name} (model, iex, pred, turn, i_gen, gen0) VALUES ({', '.join(['?']*len(values))});"
                 cursor.execute(sql, values)
             else:
                 sql: str = (f"UPDATE {name} SET pred=?, i_gen=?, gen{i_gen}=? WHERE model=? AND iex=?;")
