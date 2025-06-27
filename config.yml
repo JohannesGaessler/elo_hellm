@@ -20,7 +20,7 @@ datasets:
   - chess960
 prompt_types:
   - instant
-  # - normal
+  - normal
 
 parallel: 8
 gpus_per_server: 1

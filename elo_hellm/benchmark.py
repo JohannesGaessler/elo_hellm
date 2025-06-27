@@ -453,9 +453,15 @@ class BenchmarkChess960(Benchmark):
 Which of the following moves is the best one for {active_player} to take?
 {choices_block}"""))
 
-        assert i_gen == 0 and prompt_type == "instant"
-        prompt_suffix: str = f"The best move for {active_player} to take is ("
-        grammar = f"root ::= [{''.join(LETTERS[:len(choices)])}]"
+        if prompt_type == "instant":
+            assert i_gen == 0
+            prompt_suffix: str = f"The best move for {active_player} to take is ("
+            grammar = f"root ::= [{''.join(LETTERS[:len(choices)])}]"
+        elif prompt_type == "normal":
+            messages.append(dict(role="assistant", content=data["gen0"]))
+            messages.append(dict(role="user", content="Please enter your final answer."))
+            prompt_suffix: str = "My final answer is ("
+            grammar = f"root ::= [{''.join(LETTERS[:len(choices)])}]"
 
         data["messages"] = messages
         data["prompt_suffix"] = prompt_suffix
