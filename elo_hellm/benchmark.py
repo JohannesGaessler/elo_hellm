@@ -139,7 +139,7 @@ class Benchmark(ABC):
 
     def get_input_data(self, model: str, i_gen: int) -> list[dict]:
         data = get_dataset(self.name)
-        database_name: str = self.database_name
+        database_name: str = self.database_name()
         connection, cursor = get_db()
         n_gens: int = self.n_gens()
         assert i_gen < n_gens
