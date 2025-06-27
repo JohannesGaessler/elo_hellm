@@ -460,7 +460,7 @@ Which of the following moves is the best one for {active_player} to take?
         cursor: sqlite3.Cursor = get_db()[1]
 
         n_gens: int = self.n_gens()
-        data: list[dict] = self.get_input_data(model, self.turn, n_gens)
+        data: list[dict] = self.get_input_data(model, n_gens)
         sql: str = (f"SELECT iex, pred FROM {self.database_name()} "
             "WHERE model = ? AND iex < ? AND i_gen = ? ORDER BY iex, turn;")
         query = cursor.execute(sql, [model, len(data), n_gens])
