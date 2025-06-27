@@ -32,6 +32,8 @@ models:
   - name: gemma_3_it-4b-f16.gguf
   - name: gemma_3_it-12b-f16.gguf
     gpus_per_server: 2
+  - name: gemma_3_it-27b-q8_0.gguf
+    gpus_per_server: 2
   - name: glm_4_chat-9b-f16.gguf
   - name: llama_3.1_instruct-8b-f16.gguf
   - name: llama_3.2_instruct-1b-f16.gguf
