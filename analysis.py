@@ -50,7 +50,7 @@ ntest_total = 0
 model_scores = []
 for dataset in config.datasets:
     for prompt_type in config.prompt_types:
-        benchmark = get_benchmark(dataset, prompt_type)
+        benchmark = get_benchmark(dataset, prompt_type, turn=0)
         name: str = benchmark.database_name()
         print(f"## {name}")
         print()
