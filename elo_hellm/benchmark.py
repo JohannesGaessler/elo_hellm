@@ -142,7 +142,7 @@ class Benchmark(ABC):
         database_name: str = self.database_name()
         connection, cursor = get_db()
         n_gens: int = self.n_gens()
-        assert i_gen < n_gens
+        assert i_gen <= n_gens
 
         if i_gen == 0:
             sql: str = f"SELECT iex FROM {database_name} WHERE model = ? AND (turn > ? OR (turn = ? AND i_gen > ?));"
