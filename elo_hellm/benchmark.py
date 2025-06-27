@@ -474,6 +474,7 @@ Which of the following moves is the best one for {active_player} to take? Hint: 
         sql: str = (f"SELECT iex, pred FROM {self.database_name()} "
             "WHERE model = ? AND iex < ? AND turn = ? AND i_gen = ? ORDER BY iex, turn;")
         query = cursor.execute(sql, [model, len(data), self.turn, n_gens])
+        assert len(query) == len(data)
 
         labels = []
         pred = []
