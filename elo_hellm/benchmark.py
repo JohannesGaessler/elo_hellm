@@ -152,6 +152,7 @@ class Benchmark(ABC):
             for dt in data:
                 dt["turn"] = self.turn
                 dt["i_gen"] = i_gen
+                dt["model"] = model
                 dt["database_name"] = database_name
                 dt["prompt_type"] = self.prompt_type
                 dt["npredict"] = self.npredict_last if i_gen + 1 == n_gens else 2048  # FIXME
@@ -172,6 +173,7 @@ class Benchmark(ABC):
         for dt in data:
             dt["turn"] = self.turn
             dt["i_gen"] = i_gen
+            dt["model"] = model
             dt["database_name"] = database_name
             dt["prompt_type"] = self.prompt_type
             dt["npredict"] = self.npredict_last if i_gen + 1 == n_gens else 2048  # FIXME
@@ -368,6 +370,7 @@ class BenchmarkChess960(Benchmark):
         iex: int = data["iex"]
         i_gen: int = data["i_gen"]
         turn: int = data["turn"]
+        model: str = data["model"]
         database_name: str = data["database_name"]
         prompt_type: str = data["prompt_type"]
         state0: str = data["state0"]
@@ -383,8 +386,8 @@ class BenchmarkChess960(Benchmark):
         local_data.stockfish.set_fen_position(state0)
 
         if turn > 0:
-            sql: str = f"SELECT pred FROM {database_name} WHERE iex = ? AND turn < ? ORDER BY turn;"
-            query: list = local_data.cursor.execute(sql, [iex, turn]).fetchall()
+            sql: str = f"SELECT pred FROM {database_name} WHERE model = ? AND iex = ? AND turn < ? ORDER BY turn;"
+            query: list = local_data.cursor.execute(sql, [model, iex, turn]).fetchall()
             assert len(query) == turn, f"len(query)={len(query)} turn={turn}"
             preds: list[int] = [q[0] for q in query]
 
