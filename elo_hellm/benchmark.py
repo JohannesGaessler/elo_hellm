@@ -132,10 +132,10 @@ class Benchmark(ABC):
         return f"{self.name}_{self.prompt_type}"
 
     def database_columns(self) -> list[str]:
-        return ["model", "iex", "pred", "turn", "i_gen"] + [f"gen{i}" for i in range(self.ngens())]
+        return ["model", "iex", "pred", "turn", "i_gen"] + [f"gen{i}" for i in range(self.n_gens())]
 
     def database_types(self) -> list[str]:
-        return ["TEXT", "INTEGER", "INTEGER", "INTEGER", "INTEGER"] + ["TEXT"] * self.ngens()
+        return ["TEXT", "INTEGER", "INTEGER", "INTEGER", "INTEGER"] + ["TEXT"] * self.n_gens()
 
     def get_input_data(self, model: str, i_gen: int) -> list[dict]:
         data = get_dataset(self.name)
