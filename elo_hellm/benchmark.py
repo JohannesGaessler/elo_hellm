@@ -208,8 +208,8 @@ class Benchmark(ABC):
                 sql: str = f"INSERT INTO {name} (model, iex, pred, turn, i_gen, gen0) VALUES ({', '.join(['?']*len(values))});"
                 cursor.execute(sql, values)
             else:
-                sql: str = (f"UPDATE {name} SET pred=?, i_gen=?, gen{i_gen}=? WHERE model=? AND iex=?;")
-                cursor.execute(sql, [pred, i_gen + 1, completion, model, d["iex"]])
+                sql: str = (f"UPDATE {name} SET pred=?, i_gen=?, gen{i_gen}=? WHERE model=? AND iex=? AND turn=?;")
+                cursor.execute(sql, [pred, i_gen + 1, completion, model, d["iex"], self.turn])
         connection.commit()
 
     def get_results(self, model: str):
