@@ -450,7 +450,7 @@ class BenchmarkChess960(Benchmark):
 
 {state}
 
-Which of the following moves is the best one for {active_player} to take? Hint: the Stockfish chess engine recommends ({LETTERS[data['label']]}).
+Which of the following moves is the best one for {active_player} to take?
 {choices_block}"""))
 
         assert i_gen == 0 and prompt_type == "instant"
