@@ -430,10 +430,9 @@ class BenchmarkChess960(Benchmark):
             local_data.cursor.execute(sql, [state, json.dumps(moves), worst_legal_move])
             local_data.connection.commit()
 
-        best_move = moves[0]["Move"]
         permutation = [i for i in range(BenchmarkChess960.nchoices)]
-        # random.seed(123456 + 1000*iex + turn)
-        # random.shuffle(permutation)
+        random.seed(123456 + 1000*iex + turn)
+        random.shuffle(permutation)
         moves = [moves[permutation[i]] for i in permutation]
 
         data["label"] = permutation.index(0)
@@ -451,7 +450,7 @@ class BenchmarkChess960(Benchmark):
 
 {state}
 
-Which of the following moves is the best one for {active_player} to take? Hint: the Stockfish chess engine recommends (a).
+Which of the following moves is the best one for {active_player} to take? Hint: the Stockfish chess engine recommends ({LETTERS[data['label']]}).
 {choices_block}"""))
 
         assert i_gen == 0 and prompt_type == "instant"
@@ -482,8 +481,8 @@ Which of the following moves is the best one for {active_player} to take? Hint: 
             iex: int = q[0]
             assert iex == i
             permutation = [i for i in range(BenchmarkChess960.nchoices)]
-            # random.seed(123456 + 1000*iex + self.turn)
-            # random.shuffle(permutation)
+            random.seed(123456 + 1000*iex + self.turn)
+            random.shuffle(permutation)
             labels.append(permutation.index(0))  # TODO deduplicate
             pred.append(q[1])
         return labels, pred
