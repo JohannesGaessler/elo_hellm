@@ -42,6 +42,7 @@ class Config:
     stockfish_nchoices: int
     ctx_size: int
     num_gpus: int
+    num_workers: int
     model_dir: str
     datasets: list[str]
     prompt_types: list[str]
@@ -72,6 +73,8 @@ class Config:
         assert type(self.ctx_size) is int
         self.num_gpus = config.get("num_gpus", 1)
         assert type(self.num_gpus) is int
+        self.num_workers = config.get("num_workers", 8)
+        assert type(self.num_workers) is int
         self.model_dir = config.get("model_dir")
         assert type(self.model_dir) is str
         self.datasets = config.get("datasets")
