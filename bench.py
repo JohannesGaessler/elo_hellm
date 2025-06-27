@@ -70,11 +70,12 @@ def get_completion(data: dict) -> str:
     data["local_data"] = local_data
     data["add_message_data"](data)
 
+    session = data["session"]
     server_address: str = data["server_address"]
     npredict: int = data["npredict"]
     grammar: Optional[str] = data["grammar"]
 
-    response = requests.post(
+    response = session.post(
         f"{server_address}/apply-template",
         json=dict(messages=data["messages"])
     )
@@ -90,7 +91,7 @@ def get_completion(data: dict) -> str:
     )
     if grammar is not None:
         json_dict["grammar"] = grammar
-    response = requests.post(f"{server_address}/completion", json=json_dict)
+    response = session.post(f"{server_address}/completion", json=json_dict)
     if response.status_code != 200:
         raise RuntimeError(f"Server returned status code {response.status_code}: {response.text}")
     response_dict: dict = json.loads(response.text)
@@ -100,30 +101,32 @@ def get_completion(data: dict) -> str:
 def process_model(model: Model):
     servers = []
     try:
-        for ds in model.datasets:
-            for prompt_type in model.prompt_types:
-                turn: int = 0
-                benchmark: Benchmark = get_benchmark(ds, prompt_type, turn)
-                while turn < benchmark.n_turns():
-                    for i_gen in range(benchmark.n_gens()):
-                        data = benchmark.get_input_data(model.name, i_gen)
-                        if not data:
-                            continue
-                        if not servers:
-                            servers = get_servers(model)
-                        for i, di in enumerate(data):
-                            di["server_address"] = servers[i % len(servers)]["address"]
-
-                        t0 = time()
-                        print(f"Start: {model.name}, {benchmark.database_name()}, turn={turn}, i_gen={i_gen}")
-                        completions = thread_map(get_completion, data, max_workers=config.num_workers, chunksize=1)
-                        # Database now potentially has uncommitted changes, will be fixed committed with update_database.
-                        for d, c in zip(data, completions):
-                            d["completion"] = c
-                        benchmark.update_database(model.name, data)
-                        print(f"Done: {model.name}, {benchmark.database_name()}, turn={turn}, i_gen={i_gen}, time={time() - t0:.2f}s")
-                    turn += 1
+        with requests.Session() as session:
+            for ds in model.datasets:
+                for prompt_type in model.prompt_types:
+                    turn: int = 0
                     benchmark: Benchmark = get_benchmark(ds, prompt_type, turn)
+                    while turn < benchmark.n_turns():
+                        for i_gen in range(benchmark.n_gens()):
+                            data = benchmark.get_input_data(model.name, i_gen)
+                            if not data:
+                                continue
+                            if not servers:
+                                servers = get_servers(model)
+                            for i, di in enumerate(data):
+                                di["session"] = session
+                                di["server_address"] = servers[i % len(servers)]["address"]
+
+                            t0 = time()
+                            print(f"Start: {model.name}, {benchmark.database_name()}, turn={turn}, i_gen={i_gen}")
+                            completions = thread_map(get_completion, data, max_workers=config.num_workers, chunksize=1)
+                            # Database now potentially has uncommitted changes, will be fixed committed with update_database.
+                            for d, c in zip(data, completions):
+                                d["completion"] = c
+                            benchmark.update_database(model.name, data)
+                            print(f"Done: {model.name}, {benchmark.database_name()}, turn={turn}, i_gen={i_gen}, time={time() - t0:.2f}s")
+                        turn += 1
+                        benchmark: Benchmark = get_benchmark(ds, prompt_type, turn)
     finally:
         for server in servers:
             server["process"].terminate()
