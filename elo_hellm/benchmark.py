@@ -457,7 +457,7 @@ Which of the following moves is the best one for {active_player} to take?
             assert i_gen == 0
             prompt_suffix: str = f"The best move for {active_player} to take is ("
             grammar = f"root ::= [{''.join(LETTERS[:len(choices)])}]"
-        elif prompt_type == "normal":
+        elif prompt_type == "normal" and i_gen == 1:
             messages.append(dict(role="assistant", content=data["gen0"]))
             messages.append(dict(role="user", content="Please enter your final answer."))
             prompt_suffix: str = "My final answer is ("
