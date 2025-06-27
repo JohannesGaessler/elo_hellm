@@ -404,8 +404,6 @@ class BenchmarkChess960(Benchmark):
             assert len(query) == 1
             moves: list[dict] = json.loads(query[0][0])
         else:
-            assert local_data.stockfish.is_fen_valid(state)
-            local_data.stockfish.set_fen_position(state)
             moves: list[dict] = local_data.stockfish.get_top_moves(BenchmarkChess960.nchoices)
             moves = sorted(moves, key=BenchmarkChess960.move_to_key, reverse=True)
             BenchmarkChess960.add_random_moves(moves, iex, turn)
