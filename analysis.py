@@ -11,7 +11,7 @@ import numpy as np
 from scipy.stats import chi2
 from tabulate import tabulate
 
-from elo_hellm.benchmark import get_benchmark, BenchmarkChess960
+from elo_hellm.benchmark import get_benchmark
 from elo_hellm.config import Config
 
 
@@ -26,8 +26,7 @@ os.makedirs(DIR_OUT, exist_ok=True)
 results: dict[tuple[str, str], dict] = dict()
 for model in config.models:
     for ds in model.datasets:
-        # top: int = BenchmarkChess960.nchoices//2 if "chess960" in ds else 1
-        top: int = 1
+        top: int = config.chess960_n_top if "chess960" in ds else 1
         for prompt_type in model.prompt_types:
             labels = []
             pred = []
@@ -59,6 +58,8 @@ class BenchmarkModelScores:
         self.ncorrect = np.asarray(ncorrect)
         self.ntest = np.asarray(ncorrect)
         self.floor = floor
+        if "chess960" in name:
+            self.floot *= config.chess960_n_top
 
 
 ncorrect_total = 0

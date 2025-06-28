@@ -36,6 +36,7 @@ class Config:
     max_examples_per_dataset: int
     path_server: str
     chess960_n_halfturns: int
+    chess960_n_top: int
     stockfish_path: str
     stockfish_threads: int
     stockfish_hash: int
@@ -61,6 +62,8 @@ class Config:
         assert type(self.path_server) is str
         self.chess960_n_halfturns = config.get("chess960_n_halfturns", 20)
         assert type(self.chess960_n_halfturns) is int
+        self.chess960_n_top = config.get("chess960_n_top", 2)
+        assert type(self.chess960_n_top) is int
         self.stockfish_path = config.get("stockfish_path", "/usr/bin/stockfish")
         assert type(self.stockfish_path) is str
         self.stockfish_threads = config.get("stockfish_threads", 8)

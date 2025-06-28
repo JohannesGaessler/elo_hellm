@@ -7,6 +7,7 @@ num_gpus: 6
 num_workers: 128
 
 chess960_n_halfturns: 50
+chess960_n_top: 2
 
 stockfish_path: /usr/bin/stockfish
 stockfish_threads: 1
