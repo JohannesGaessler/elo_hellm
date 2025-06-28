@@ -40,7 +40,10 @@ for model in config.models:
 
                 turn += 1
                 benchmark = get_benchmark(ds, prompt_type, turn)
-            results[(model.name, benchmark.database_name())] = (np.array(labels, dtype=np.int64), np.array(pred, dtype=np.int64))
+            labels = np.array(labels, dtype=np.int64)
+            pred = np.array(pred, dtype=np.int64)
+            pred = np.reshape(pred, pred.shape + (1,))
+            results[(model.name, benchmark.database_name())] = (labels, pred)
 
 
 class BenchmarkModelScores:

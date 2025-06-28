@@ -511,8 +511,6 @@ Which of the following moves is the best one for {active_player} to take?
             else:
                 labels.append([permutation.index(i) for i in range(top)])
             pred.append(q[1])
-        pred = np.array(pred)
-        pred = np.reshape(pred, pred.shape + (1,))
         return labels, pred
 
 
