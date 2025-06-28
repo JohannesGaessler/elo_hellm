@@ -26,7 +26,8 @@ os.makedirs(DIR_OUT, exist_ok=True)
 results: dict[tuple[str, str], dict] = dict()
 for model in config.models:
     for ds in model.datasets:
-        top: int = BenchmarkChess960.nchoices//2 if "chess960" in ds else 1
+        # top: int = BenchmarkChess960.nchoices//2 if "chess960" in ds else 1
+        top: int = 1
         for prompt_type in model.prompt_types:
             labels = []
             pred = []
@@ -34,10 +35,9 @@ for model in config.models:
             turn: int = 0
             benchmark = get_benchmark(ds, prompt_type, turn)
             while turn < benchmark.n_turns():
-                if "chess960" not in ds or turn >= 20:
-                    l, p = benchmark.get_results(model.name, top)
-                    labels += l
-                    pred += p
+                l, p = benchmark.get_results(model.name, top)
+                labels += l
+                pred += p
 
                 turn += 1
                 benchmark = get_benchmark(ds, prompt_type, turn)
