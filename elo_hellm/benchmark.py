@@ -468,25 +468,42 @@ class BenchmarkChess960(Benchmark):
         prompt_suffix = ""
         grammar: Optional[str] = None
 
+        PRETTY_NAMES: dict[str, str] = {
+            "P": "a white pawn", "R": "a white rook", "N": "a white knight", "B": "a white bishop", "Q": "the white queen", "K": "the white king",
+            "p": "a black pawn", "r": "a black rook", "n": "a black knight", "b": "a black bishop", "q": "the black queen", "k": "the black king",
+        }
+        positions: list[str] = []
+        for rank in range(1, 9):
+            for file in range(1, 9):
+                square: str = f"{LETTERS[file]}{rank}"
+                piece = local_data.stockfish.get_what_is_on_square(square)
+                if piece is None:
+                    continue
+                positions.append("{PRETTY_NAMES[piece.value]} on {square}")
+        positions_block = "\n".join(positions)
+
         PRETTY_NAMES: dict[str, str] = {"p": "a pawn", "r": "a rook", "n": "a knight", "b": "a bishop", "q": "the queen", "k": "the king"}
 
         choices = []
         for letter, move in zip(LETTERS, moves):
             move_uci: str = move["Move"]
-            assert len(move_uci) == 4, f"move_uci={move_uci} moves={moves} state={state} visual:\n{local_data.stockfish.get_board_visual()}"
-            start: str = move_uci[:2]
-            destination: str = move_uci[2:]
+            assert len(move_uci) == 4 or len(move_uci) == 5, \
+                f"move_uci={move_uci} moves={moves} state={state} visual:\n{local_data.stockfish.get_board_visual()}"
+            start: str = move_uci[0:2]
+            destination: str = move_uci[2:0]
             piece = local_data.stockfish.get_what_is_on_square(start)
             pretty_name: str = PRETTY_NAMES[local_data.random.choice(list(PRETTY_NAMES.keys())) if piece is None else piece.value.lower()]
-            choices.append(f"({letter}): Moving {pretty_name} from {start} to {destination}.")
+            choices.append(f"({letter}): Move {pretty_name} from {start} to {destination}.")
         choices_block = "\n".join(choices)
         messages.append(dict(role="user", content=f"""Consider the following game of chess960 in Forsyth–Edwards Notation:
 
 {state}
 
+Positions: {positions_block}.
+
 Which of the following moves is the best one for {active_player} to take?
 {choices_block}"""))
-        # print(f"model={model} iex={iex} permutation={permutation} prompt={messages[-1]["content"]}")
+        print(f"model={model} iex={iex} permutation={permutation} prompt={messages[-1]["content"]}")
 
         if prompt_type == "instant":
             assert i_gen == 0
