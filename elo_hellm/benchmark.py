@@ -333,7 +333,7 @@ class BenchmarkChess960(Benchmark):
     def __init__(self, prompt_type: str, turn: int):
         super().__init__("chess960", prompt_type, turn)
         self.npredict_last = 1
-        self.score_rng = 1.0 / self.nchoices
+        self.score_rng = config.chess960_n_top / self.nchoices
 
         connection, cursor = get_db()
         sql: str = "CREATE TABLE IF NOT EXISTS stockfish_cache(fen TEXT, moves TEXT NOT NULL, worst_legal_move INTEGER NOT NULL, PRIMARY KEY (fen));"
