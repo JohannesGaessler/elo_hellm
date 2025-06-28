@@ -503,7 +503,7 @@ Positions: {positions_block}.
 
 Which of the following moves is the best one for {active_player} to take?
 {choices_block}"""))
-        print(f"model={model} iex={iex} permutation={permutation} prompt={messages[-1]["content"]}")
+        # print(f"model={model} iex={iex} permutation={permutation} prompt={messages[-1]["content"]}")
 
         if prompt_type == "instant":
             assert i_gen == 0
