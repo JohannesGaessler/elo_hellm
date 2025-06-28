@@ -28,7 +28,7 @@ gpus_per_server: 1
 models:
   # - name: gemma_2_it-9b-f16.gguf
   #   parallel: 2
-  - name: gemma_3_it-1b-f16.gguf
+  # - name: gemma_3_it-1b-f16.gguf
   # - name: gemma_3_it-4b-f16.gguf
   # - name: gemma_3_it-12b-f16.gguf
   #   gpus_per_server: 2
@@ -36,7 +36,7 @@ models:
     gpus_per_server: 2
   # - name: glm_4_chat-9b-f16.gguf
   # - name: llama_3.1_instruct-8b-f16.gguf
-  - name: llama_3.2_instruct-1b-f16.gguf
+  # - name: llama_3.2_instruct-1b-f16.gguf
   # - name: llama_3.2_instruct-3b-f16.gguf
   # - name: llama_4_scout_17b_16e_instruct-108b-q3_k_h.gguf
   #   gpus_per_server: 3
