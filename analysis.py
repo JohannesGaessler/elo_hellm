@@ -34,9 +34,10 @@ for model in config.models:
             turn: int = 0
             benchmark = get_benchmark(ds, prompt_type, turn)
             while turn < benchmark.n_turns():
-                l, p = benchmark.get_results(model.name, top)
-                labels += l
-                pred += p
+                if "chess960" not in ds or turn >= 20:
+                    l, p = benchmark.get_results(model.name, top)
+                    labels += l
+                    pred += p
 
                 turn += 1
                 benchmark = get_benchmark(ds, prompt_type, turn)
