@@ -424,7 +424,7 @@ class BenchmarkChess960(Benchmark):
         else:
             moves: list[dict] = local_data.stockfish.get_top_moves(BenchmarkChess960.nchoices)
             moves = sorted(moves, key=BenchmarkChess960.move_to_key, reverse=True)
-            assert len(moves) >= 1
+            assert len(moves) >= 1, f"state={state}"
             worst_legal_move: int = len(moves) - 1
             BenchmarkChess960.add_random_moves(moves, iex, i_gen, turn)
 
