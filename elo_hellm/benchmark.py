@@ -471,7 +471,7 @@ class BenchmarkChess960(Benchmark):
             start: str = move_uci[:2]
             destination: str = move_uci[2:]
             piece = local_data.stockfish.get_what_is_on_square(start)
-            pretty_name: str = PRETTY_NAMES[local_data.random.choice(list(PRETTY_NAMES.values())) if piece is None else piece.value]
+            pretty_name: str = PRETTY_NAMES[local_data.random.choice(list(PRETTY_NAMES.values())) if piece is None else piece.value.lower()]
             choices.append(f"({letter}): Moving {pretty_name} from {start} to {destination}.")
         choices_block = "\n".join(choices)
         messages.append(dict(role="user", content=f"""Consider the following game of chess in Forsyth–Edwards Notation:
