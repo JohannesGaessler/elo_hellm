@@ -46,13 +46,13 @@ for model in config.models:
 class BenchmarkModelScores:
     name: str
     ncorrect: np.ndarray
-    ntest: int
+    ntest: np.ndarray
     floor: float
 
-    def __init__(self, name: str, ncorrect: Iterable[int], ntest: int, floor: float):
+    def __init__(self, name: str, ncorrect: Iterable[int], ntest: Iterable[int], floor: float):
         self.name = name
         self.ncorrect = np.asarray(ncorrect)
-        self.ntest = ntest
+        self.ntest = np.asarray(ncorrect)
         self.floor = floor
 
 
@@ -68,15 +68,12 @@ for dataset in config.datasets:
 
         rows: list[list] = []
         ncorrect = np.zeros(len(config.models), dtype=np.int64)
-        ntest = None
+        ntest = np.zeros(len(config.models), dtype=np.int64)
         for i, model_i in enumerate(config.models):
             labels, pred = results[(model_i.name, name)]
-            if ntest is None:
-                ntest = labels.shape[0]
-            else:
-                assert "chess960" in name or labels.shape[0] == ntest
+            ntest[i] = labels.shape[0]
             ncorrect[i] = np.sum(pred == labels)
-            rows.append([model_i.name, model_i.file_size / 1024 ** 3, f"{ncorrect[i]}/{ntest}", ncorrect[i]/ntest])
+            rows.append([model_i.name, model_i.file_size / 1024 ** 3, f"{ncorrect[i]}/{ntest[i]}", ncorrect[i]/ntest[i]])
         rows = sorted(rows, key=lambda r: r[1], reverse=True)
         for r1 in rows:
             pareto_frontier: bool = True
@@ -86,7 +83,7 @@ for dataset in config.datasets:
                     break
             r1.append(pareto_frontier)
         ncorrect_total += np.sum(ncorrect)
-        ntest_total += ncorrect.shape[0] * ntest
+        ntest_total += np.sum(ntest)
 
         plt.figure()
         file_sizes_gib = np.array([r[1] for r in rows if r[4]])
