@@ -418,6 +418,12 @@ class BenchmarkChess960(Benchmark):
                 query: list = local_data.cursor.execute(sql, [state]).fetchall()
                 assert len(query) == 1, f"iex={iex} preds={preds} i={i} len(query)={len(query)}"
                 moves: list[dict] = json.loads(query[0][0])
+
+                permutation = [i for i in range(BenchmarkChess960.nchoices)]
+                local_data.random.seed(123456 + 1000*iex + i)
+                local_data.random.shuffle(permutation)
+                moves = [moves[permutation[i]] for i in permutation]
+
                 move_uci: str = moves[preds[i]]["Move"]
 
                 if board.is_legal(chess.Move.from_uci(move_uci)):
@@ -474,7 +480,7 @@ class BenchmarkChess960(Benchmark):
             pretty_name: str = PRETTY_NAMES[local_data.random.choice(list(PRETTY_NAMES.values())) if piece is None else piece.value.lower()]
             choices.append(f"({letter}): Moving {pretty_name} from {start} to {destination}.")
         choices_block = "\n".join(choices)
-        messages.append(dict(role="user", content=f"""Consider the following game of chess in Forsyth–Edwards Notation:
+        messages.append(dict(role="user", content=f"""Consider the following game of chess960 in Forsyth–Edwards Notation:
 
 {state}
 
