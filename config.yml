@@ -19,37 +19,37 @@ datasets:
   - mmlu_pro_test
   - chess960
 prompt_types:
-  - instant
+  # - instant
   - normal
 
 parallel: 8
 gpus_per_server: 1
 
 models:
-  - name: gemma_2_it-9b-f16.gguf
-    parallel: 2
-  - name: gemma_3_it-1b-f16.gguf
-  - name: gemma_3_it-4b-f16.gguf
-  - name: gemma_3_it-12b-f16.gguf
-    gpus_per_server: 2
+  # - name: gemma_2_it-9b-f16.gguf
+  #   parallel: 2
+  # - name: gemma_3_it-1b-f16.gguf
+  # - name: gemma_3_it-4b-f16.gguf
+  # - name: gemma_3_it-12b-f16.gguf
+  #   gpus_per_server: 2
   - name: gemma_3_it-27b-q8_0.gguf
     gpus_per_server: 2
-  - name: glm_4_chat-9b-f16.gguf
-  - name: llama_3.1_instruct-8b-f16.gguf
-  - name: llama_3.2_instruct-1b-f16.gguf
-  - name: llama_3.2_instruct-3b-f16.gguf
+  # - name: glm_4_chat-9b-f16.gguf
+  # - name: llama_3.1_instruct-8b-f16.gguf
+  # - name: llama_3.2_instruct-1b-f16.gguf
+  # - name: llama_3.2_instruct-3b-f16.gguf
   # - name: llama_4_scout_17b_16e_instruct-108b-q3_k_h.gguf
   #   gpus_per_server: 3
-  - name: ministral_instruct_2410-8b-f16.gguf
-  - name: mistral_nemo_instruct_2407-12b-f16.gguf
-    gpus_per_server: 2
-  - name: mistral_small_3.1_instruct_2503-24b-f16.gguf
-    gpus_per_server: 3
+  # - name: ministral_instruct_2410-8b-f16.gguf
+  # - name: mistral_nemo_instruct_2407-12b-f16.gguf
+  #   gpus_per_server: 2
+  # - name: mistral_small_3.1_instruct_2503-24b-f16.gguf
+  #   gpus_per_server: 3
   - name: phi_4-15b-f16.gguf
     gpus_per_server: 2
-  - name: phi_4_mini_instruct-4b-f16.gguf
-  - name: qwen_2.5_instruct_1m-7b-f16.gguf
+  # - name: phi_4_mini_instruct-4b-f16.gguf
+  # - name: qwen_2.5_instruct_1m-7b-f16.gguf
   # - name: qwq-32b-q8_0.gguf
   #   # gpus_per_server: 4
   #   gpus_per_server: 2
-  - name: stablelm_2_chat-2b-f16.gguf
+  # - name: stablelm_2_chat-2b-f16.gguf

@@ -422,7 +422,7 @@ class BenchmarkChess960(Benchmark):
                 permutation = [i for i in range(BenchmarkChess960.nchoices)]
                 local_data.random.seed(123456 + 1000*iex + i)
                 local_data.random.shuffle(permutation)
-                moves = [moves[permutation[i]] for i in permutation]
+                moves = [moves[p] for p in permutation]
 
                 move_uci: str = moves[preds[i]]["Move"]
 
@@ -457,7 +457,7 @@ class BenchmarkChess960(Benchmark):
         permutation = [i for i in range(BenchmarkChess960.nchoices)]
         local_data.random.seed(123456 + 1000*iex + turn)
         local_data.random.shuffle(permutation)
-        moves = [moves[permutation[i]] for i in permutation]
+        moves = [moves[p] for p in permutation]
 
         data["label"] = permutation.index(0)
         data["moves"] = moves
