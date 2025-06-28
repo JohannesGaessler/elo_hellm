@@ -486,6 +486,7 @@ class BenchmarkChess960(Benchmark):
 
 Which of the following moves is the best one for {active_player} to take?
 {choices_block}"""))
+        print(f"model={model} iex={iex} permutation={permutation} prompt={messages[-1]["content"]}")
 
         if prompt_type == "instant":
             assert i_gen == 0
@@ -530,6 +531,7 @@ Which of the following moves is the best one for {active_player} to take?
             else:
                 labels.append([permutation.index(i) for i in range(top)])
             pred.append(q[1])
+            print(f"model={model} iex={iex} permutation={permutation}")
         return labels, pred
 
 

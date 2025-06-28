@@ -1,12 +1,12 @@
 debug: False
-max_examples_per_dataset: 100
+max_examples_per_dataset: 10
 
 path_server: /home/johannesg/Projects/llama.cpp/build/bin/llama-server
 model_dir: /opt/models
 num_gpus: 6
-num_workers: 128
+num_workers: 1
 
-chess960_n_halfturns: 30
+chess960_n_halfturns: 2
 
 stockfish_path: /usr/bin/stockfish
 stockfish_threads: 1
