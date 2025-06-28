@@ -4,13 +4,12 @@ from abc import ABC, abstractmethod
 from copy import deepcopy
 import json
 import os
-import random
+from random import Random
 import sqlite3
 from typing import Optional
 
 import chess
 import datasets
-import numpy as np
 from stockfish import Stockfish
 
 from elo_hellm.config import Config
@@ -447,8 +446,10 @@ class BenchmarkChess960(Benchmark):
             local_data.connection.commit()
 
         permutation = [i for i in range(BenchmarkChess960.nchoices)]
-        random.seed(123456 + 1000*iex + turn)
-        random.shuffle(permutation)
+        if not hasattr(local_data, "random"):
+            local_data.random = Random()
+        local_data.random.seed(123456 + 1000*iex + turn)
+        local_data.random.shuffle(permutation)
         moves = [moves[permutation[i]] for i in permutation]
 
         data["label"] = permutation.index(0)
@@ -500,6 +501,7 @@ Which of the following moves is the best one for {active_player} to take?
 
         labels = []
         pred = []
+        random = Random()
         for i, q in enumerate(query):
             iex: int = q[0]
             assert i <= iex
