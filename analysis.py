@@ -74,7 +74,7 @@ for dataset in config.datasets:
             if ntest is None:
                 ntest = labels.shape[0]
             else:
-                assert "chess960" not in name or labels.shape[0] == ntest
+                assert "chess960" in name or labels.shape[0] == ntest
             ncorrect[i] = np.sum(pred == labels)
             rows.append([model_i.name, model_i.file_size / 1024 ** 3, f"{ncorrect[i]}/{ntest}", ncorrect[i]/ntest])
         rows = sorted(rows, key=lambda r: r[1], reverse=True)
