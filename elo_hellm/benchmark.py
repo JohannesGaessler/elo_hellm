@@ -490,7 +490,7 @@ class BenchmarkChess960(Benchmark):
             assert len(move_uci) == 4 or len(move_uci) == 5, \
                 f"move_uci={move_uci} moves={moves} state={state} visual:\n{local_data.stockfish.get_board_visual()}"
             start: str = move_uci[0:2]
-            destination: str = move_uci[2:0]
+            destination: str = move_uci[2:4]
             piece = local_data.stockfish.get_what_is_on_square(start)
             pretty_name: str = PRETTY_NAMES[local_data.random.choice(list(PRETTY_NAMES.keys())) if piece is None else piece.value.lower()]
             choices.append(f"({letter}): Move {pretty_name} from {start} to {destination}.")
