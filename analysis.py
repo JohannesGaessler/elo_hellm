@@ -42,7 +42,8 @@ for model in config.models:
                 benchmark = get_benchmark(ds, prompt_type, turn)
             labels = np.array(labels, dtype=np.int64)
             pred = np.array(pred, dtype=np.int64)
-            pred = np.reshape(pred, pred.shape + (1,))
+            if top > 1:
+                pred = np.reshape(pred, pred.shape + (1,))
             results[(model.name, benchmark.database_name())] = (labels, pred)
 
 
