@@ -398,7 +398,10 @@ class BenchmarkChess960(Benchmark):
         if turn > 0:
             sql: str = f"SELECT pred FROM {database_name} WHERE model = ? AND iex = ? AND turn < ? ORDER BY turn;"
             query: list = local_data.cursor.execute(sql, [model, iex, turn]).fetchall()
-            assert len(query) == turn, f"len(query)={len(query)} turn={turn}"
+            assert len(query) <= turn, f"len(query)={len(query)} turn={turn}"
+            if len(query) < turn:
+                data["skip"] = True
+                return
             preds: list[int] = [q[0] for q in query]
 
             for i in range(turn):
