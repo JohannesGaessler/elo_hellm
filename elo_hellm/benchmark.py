@@ -473,7 +473,7 @@ class BenchmarkChess960(Benchmark):
         choices = []
         for letter, move in zip(LETTERS, moves):
             move_uci: str = move["Move"]
-            assert len(move_uci) == 4
+            assert len(move_uci) == 4, f"move_uci={move_uci} moves={moves} state={state} visual:\n{local_data.stockfish.get_board_visual()}"
             start: str = move_uci[:2]
             destination: str = move_uci[2:]
             piece = local_data.stockfish.get_what_is_on_square(start)
