@@ -421,6 +421,9 @@ class BenchmarkChess960(Benchmark):
                     local_data.stockfish.make_moves_from_current_position([worst_legal_move_uci])
 
         state: str = local_data.stockfish.get_fen_position()
+        if chess.Board(state).outcome() is not None:
+            data["skip"] = True
+            return
         sql: str = "SELECT moves FROM stockfish_cache WHERE fen=?;"
         query: list = local_data.cursor.execute(sql, [state]).fetchall()
 
