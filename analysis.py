@@ -26,7 +26,7 @@ os.makedirs(DIR_OUT, exist_ok=True)
 results: dict[tuple[str, str], dict] = dict()
 for model in config.models:
     for ds in model.datasets:
-        top: int = BenchmarkChess960.nchoices/2 if "chess960" in ds else 1
+        top: int = BenchmarkChess960.nchoices//2 if "chess960" in ds else 1
         for prompt_type in model.prompt_types:
             labels = []
             pred = []
