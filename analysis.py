@@ -59,7 +59,7 @@ class BenchmarkModelScores:
         self.ntest = np.asarray(ncorrect)
         self.floor = floor
         if "chess960" in name:
-            self.floot *= config.chess960_n_top
+            self.floor *= config.chess960_n_top
 
 
 ncorrect_total = 0
