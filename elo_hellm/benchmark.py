@@ -474,8 +474,8 @@ class BenchmarkChess960(Benchmark):
         }
         positions: list[str] = []
         for rank in range(1, 9):
-            for file in range(1, 9):
-                square: str = f"{LETTERS[file]}{rank}"
+            for file in LETTERS[:8]:
+                square: str = f"{file}{rank}"
                 piece = local_data.stockfish.get_what_is_on_square(square)
                 if piece is None:
                     continue
