@@ -4,7 +4,6 @@ import os
 from typing import Iterable
 
 from adjustText import adjust_text
-from iminuit import Minuit
 from inspect import Parameter, Signature
 from kafe2 import CustomFit
 import matplotlib.pyplot as plt
@@ -12,7 +11,7 @@ import numpy as np
 from scipy.stats import chi2
 from tabulate import tabulate
 
-from elo_hellm.benchmark import get_benchmark
+from elo_hellm.benchmark import get_benchmark, BenchmarkChess960
 from elo_hellm.config import Config
 
 
@@ -27,6 +26,7 @@ os.makedirs(DIR_OUT, exist_ok=True)
 results: dict[tuple[str, str], dict] = dict()
 for model in config.models:
     for ds in model.datasets:
+        top: int = BenchmarkChess960.nchoices/2 if "chess960" in ds else 1
         for prompt_type in model.prompt_types:
             labels = []
             pred = []
@@ -34,10 +34,9 @@ for model in config.models:
             turn: int = 0
             benchmark = get_benchmark(ds, prompt_type, turn)
             while turn < benchmark.n_turns():
-                if "chess960" not in benchmark.name or turn >= 10:
-                    l, p = benchmark.get_results(model.name)
-                    labels += l
-                    pred += p
+                l, p = benchmark.get_results(model.name, top)
+                labels += l
+                pred += p
 
                 turn += 1
                 benchmark = get_benchmark(ds, prompt_type, turn)

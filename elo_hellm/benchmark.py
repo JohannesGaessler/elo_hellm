@@ -10,6 +10,7 @@ from typing import Optional
 
 import chess
 import datasets
+import numpy as np
 from stockfish import Stockfish
 
 from elo_hellm.config import Config
@@ -214,7 +215,8 @@ class Benchmark(ABC):
                 cursor.execute(sql, [pred, i_gen + 1, completion, model, d["iex"], self.turn])
         connection.commit()
 
-    def get_results(self, model: str):
+    def get_results(self, model: str, top: int):
+        assert top == 1
         cursor: sqlite3.Cursor = get_db()[1]
 
         n_gens: int = self.n_gens()
@@ -485,7 +487,8 @@ Which of the following moves is the best one for {active_player} to take?
     def get_prediction(completion: str) -> int:
         return LETTERS.index(completion[:1])
 
-    def get_results(self, model: str):
+    def get_results(self, model: str, top: int):
+        assert top >= 1
         cursor: sqlite3.Cursor = get_db()[1]
 
         n_gens: int = self.n_gens()
@@ -503,8 +506,13 @@ Which of the following moves is the best one for {active_player} to take?
             permutation = [i for i in range(BenchmarkChess960.nchoices)]
             random.seed(123456 + 1000*iex + self.turn)
             random.shuffle(permutation)
-            labels.append(permutation.index(0))  # TODO deduplicate
+            if top == 1:
+                labels.append(permutation.index(0))
+            else:
+                labels.append([permutation.index(i) for i in range(top)])
             pred.append(q[1])
+        pred = np.array(pred)
+        pred = np.reshape(pred, pred.shape + (1,))
         return labels, pred
 
 
