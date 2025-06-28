@@ -479,7 +479,7 @@ class BenchmarkChess960(Benchmark):
                 piece = local_data.stockfish.get_what_is_on_square(square)
                 if piece is None:
                     continue
-                positions.append("f{PRETTY_NAMES[piece.value]} on {square}")
+                positions.append(f"{PRETTY_NAMES[piece.value]} on {square}")
         positions_block = ", ".join(positions)
 
         PRETTY_NAMES: dict[str, str] = {"p": "a pawn", "r": "a rook", "n": "a knight", "b": "a bishop", "q": "the queen", "k": "the king"}
