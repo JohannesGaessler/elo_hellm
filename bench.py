@@ -69,6 +69,8 @@ local_data = threading.local()
 def get_completion(data: dict) -> str:
     data["local_data"] = local_data
     data["add_message_data"](data)
+    if data.get("skip", False):
+        return None
 
     session = data["session"]
     server_address: str = data["server_address"]
@@ -120,7 +122,6 @@ def process_model(model: Model):
                             t0 = time()
                             print(f"Start: {model.name}, {benchmark.database_name()}, turn={turn}, i_gen={i_gen}")
                             completions = thread_map(get_completion, data, max_workers=config.num_workers, chunksize=1)
-                            # Database now potentially has uncommitted changes, will be fixed committed with update_database.
                             for d, c in zip(data, completions):
                                 d["completion"] = c
                             benchmark.update_database(model.name, data)

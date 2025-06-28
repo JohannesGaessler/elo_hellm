@@ -199,6 +199,8 @@ class Benchmark(ABC):
         name: str = self.database_name()
         n_gens: int = self.n_gens()
         for d in data:
+            if d.get("skip", False):
+                continue
             i_gen: int = d["i_gen"]
             completion: str = d["completion"]
             pred: str = "NULL" if i_gen + 1 < n_gens else str(self.get_prediction(completion))
@@ -401,13 +403,17 @@ class BenchmarkChess960(Benchmark):
 
             for i in range(turn):
                 state: str = local_data.stockfish.get_fen_position()
+                board: chess.Board = chess.Board(state)
+                if board.outcome() is not None:
+                    data["skip"] = True
+                    return
                 sql: str = "SELECT moves, worst_legal_move FROM stockfish_cache WHERE fen=?;"
                 query: list = local_data.cursor.execute(sql, [state]).fetchall()
                 assert len(query) == 1, f"iex={iex} preds={preds} i={i} len(query)={len(query)}"
                 moves: list[dict] = json.loads(query[0][0])
                 move_uci: str = moves[preds[i]]["Move"]
 
-                if chess.Board(state).is_legal(chess.Move.from_uci(move_uci)):
+                if board.is_legal(chess.Move.from_uci(move_uci)):
                     local_data.stockfish.make_moves_from_current_position([move_uci])
                 else:
                     worst_legal_move_index: int = query[0][1]
@@ -481,13 +487,13 @@ Which of the following moves is the best one for {active_player} to take?
         sql: str = (f"SELECT iex, pred FROM {self.database_name()} "
             "WHERE model = ? AND iex < ? AND turn = ? AND i_gen = ? ORDER BY iex, turn;")
         query = cursor.execute(sql, [model, len(data), self.turn, n_gens]).fetchall()
-        assert len(query) == len(data)
+        assert len(query) <= len(data)
 
         labels = []
         pred = []
         for i, q in enumerate(query):
             iex: int = q[0]
-            assert iex == i
+            assert i <= iex
             permutation = [i for i in range(BenchmarkChess960.nchoices)]
             random.seed(123456 + 1000*iex + self.turn)
             random.shuffle(permutation)
