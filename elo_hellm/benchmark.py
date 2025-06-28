@@ -54,6 +54,7 @@ datasets_usable: dict = dict()
 def get_dataset(name: str) -> list[dict]:
     if name not in datasets_usable:
         if name == "gpqa_main":
+            random = Random()
             random.seed(123456)
             gpqa_raw = get_dataset_raw("gpqa")["train"]
             data = []
@@ -344,7 +345,7 @@ class BenchmarkChess960(Benchmark):
         return config.chess960_n_halfturns
 
     @staticmethod
-    def add_random_moves(moves: list[dict], iex: int, i_gen: int, turn: int) -> None:
+    def add_random_moves(random, moves: list[dict], iex: int, i_gen: int, turn: int) -> None:
         assert len(moves) <= BenchmarkChess960.nchoices
         if len(moves) == BenchmarkChess960.nchoices:
             return
@@ -392,6 +393,8 @@ class BenchmarkChess960(Benchmark):
         if not hasattr(local_data, "connection"):
             local_data.connection = sqlite3.connect(path_db, timeout=999999)
             local_data.cursor = local_data.connection.cursor()
+        if not hasattr(local_data, "random"):
+            local_data.random = Random()
 
         assert local_data.stockfish.is_fen_valid(state0)
         local_data.stockfish.set_fen_position(state0)
@@ -439,15 +442,13 @@ class BenchmarkChess960(Benchmark):
             moves = sorted(moves, key=BenchmarkChess960.move_to_key, reverse=True)
             assert len(moves) >= 1, f"state={state} visual:\n{local_data.stockfish.get_board_visual()}"
             worst_legal_move: int = len(moves) - 1
-            BenchmarkChess960.add_random_moves(moves, iex, i_gen, turn)
+            BenchmarkChess960.add_random_moves(local_data.random, moves, iex, i_gen, turn)
 
             sql: str = "INSERT INTO stockfish_cache VALUES (?, ?, ?);"
             local_data.cursor.execute(sql, [state, json.dumps(moves), worst_legal_move])
             local_data.connection.commit()
 
         permutation = [i for i in range(BenchmarkChess960.nchoices)]
-        if not hasattr(local_data, "random"):
-            local_data.random = Random()
         local_data.random.seed(123456 + 1000*iex + turn)
         local_data.random.shuffle(permutation)
         moves = [moves[permutation[i]] for i in permutation]
