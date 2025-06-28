@@ -406,11 +406,12 @@ class BenchmarkChess960(Benchmark):
                 assert len(query) == 1, f"iex={iex} preds={preds} i={i} len(query)={len(query)}"
                 moves: list[dict] = json.loads(query[0][0])
                 move_uci: str = moves[preds[i]]["Move"]
-                worst_legal_move_uci: int = query[0][1]
 
                 if chess.Board(state).is_legal(chess.Move.from_uci(move_uci)):
                     local_data.stockfish.make_moves_from_current_position([move_uci])
                 else:
+                    worst_legal_move_index: int = query[0][1]
+                    worst_legal_move_uci: str = moves[worst_legal_move_index]["Move"]
                     local_data.stockfish.make_moves_from_current_position([worst_legal_move_uci])
 
         state: str = local_data.stockfish.get_fen_position()
@@ -423,6 +424,7 @@ class BenchmarkChess960(Benchmark):
         else:
             moves: list[dict] = local_data.stockfish.get_top_moves(BenchmarkChess960.nchoices)
             moves = sorted(moves, key=BenchmarkChess960.move_to_key, reverse=True)
+            assert len(moves) >= 1
             worst_legal_move: int = len(moves) - 1
             BenchmarkChess960.add_random_moves(moves, iex, i_gen, turn)
 
