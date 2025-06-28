@@ -87,12 +87,14 @@ for dataset in config.datasets:
 
         plt.figure()
         file_sizes_gib = np.array([r[1] for r in rows if r[4]])
+        ntest_plot = np.array([nt for nt, r in zip(ntest, rows) if r[4]])
         win_rates = np.array([r[3] for r in rows if r[4]])
-        win_rates_unc = np.sqrt(win_rates * (1.0 - win_rates) / ntest)
+        win_rates_unc = np.sqrt(win_rates * (1.0 - win_rates) / ntest_plot)
         plt.errorbar(file_sizes_gib, win_rates, win_rates_unc, marker=".")
         file_sizes_gib = np.array([r[1] for r in rows if not r[4]])
+        ntest_plot = np.array([nt for nt, r in zip(ntest, rows) if not r[4]])
         win_rates = np.array([r[3] for r in rows if not r[4]])
-        win_rates_unc = np.sqrt(win_rates * (1.0 - win_rates) / ntest)
+        win_rates_unc = np.sqrt(win_rates * (1.0 - win_rates) / ntest_plot)
         plt.errorbar(file_sizes_gib, win_rates, win_rates_unc, marker=".", linestyle="none")
         if benchmark.score_rng != 0.0:
             plt.hlines(benchmark.score_rng, 0, 50, colors="black", linestyles=":")
