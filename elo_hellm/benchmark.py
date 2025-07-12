@@ -124,8 +124,15 @@ class Benchmark(ABC):
         connection.commit()
 
     @staticmethod
+    def n_models() -> int:
+        return 1
+
+    @staticmethod
     def n_turns() -> int:
         return 1
+
+    def active_model(self) -> int:
+        return self.turn % self.n_models()
 
     def n_gens(self) -> int:
         if self.prompt_type == "instant":
@@ -137,10 +144,10 @@ class Benchmark(ABC):
         return f"{self.name}_{self.prompt_type}"
 
     def database_columns(self) -> list[str]:
-        return ["model", "iex", "pred", "turn", "i_gen"] + [f"gen{i}" for i in range(self.n_gens())]
+        return ["iex", "pred", "turn", "i_gen"] + [f"model{i}" for i in range(self.n_models())] + [f"gen{i}" for i in range(self.n_gens())]
 
     def database_types(self) -> list[str]:
-        return ["TEXT", "INTEGER", "INTEGER", "INTEGER", "INTEGER"] + ["TEXT"] * self.n_gens()
+        return ["INTEGER", "INTEGER", "INTEGER", "INTEGER"] + ["TEXT"] * (self.n_models() + self.n_gens())
 
     def get_input_data(self, model: str, i_gen: int) -> list[dict]:
         data_0 = get_dataset(self.name)
@@ -165,7 +172,8 @@ class Benchmark(ABC):
             return data
 
         columns: list[str] = ["iex"] + [f"gen{i}" for i in range(i_gen)]
-        sql: str = f"SELECT {', '.join(columns)} FROM {database_name} WHERE model = ? AND iex < ? AND turn = ? AND i_gen = ? ORDER BY iex;"
+        sql: str = (f"SELECT {', '.join(columns)} FROM {database_name} "
+            f"WHERE model{self.active_model()} = ? AND iex < ? AND turn = ? AND i_gen = ? ORDER BY iex;")
         query = cursor.execute(sql, [model, len(data_0), self.turn, i_gen]).fetchall()
 
         data = []
@@ -195,7 +203,7 @@ class Benchmark(ABC):
     def get_prediction(completion: str) -> int:
         pass
 
-    def update_database(self, model: str, data: list[dict]):
+    def update_database(self, models: list[str], data: list[dict]):
         connection, cursor = get_db()
         name: str = self.database_name()
         n_gens: int = self.n_gens()
@@ -207,12 +215,14 @@ class Benchmark(ABC):
             pred: str = "NULL" if i_gen + 1 < n_gens else str(self.get_prediction(completion))
 
             if i_gen == 0:
-                values: list[str] = [model, str(d["iex"]), pred, str(self.turn), str(i_gen + 1), completion]
-                sql: str = f"INSERT INTO {name} (model, iex, pred, turn, i_gen, gen0) VALUES ({', '.join(['?']*len(values))});"
+                values: list[str] = [str(d["iex"]), pred, str(self.turn), str(i_gen + 1)] + models + [completion]
+                models_str: str = ", ".join([f"model{i}" for i in range(self.n_models())])
+                sql: str = f"INSERT INTO {name} (iex, pred, turn, i_gen, {models_str}, gen0) VALUES ({', '.join(['?']*len(values))});"
                 cursor.execute(sql, values)
             else:
-                sql: str = (f"UPDATE {name} SET pred=?, i_gen=?, gen{i_gen}=? WHERE model=? AND iex=? AND turn=?;")
-                cursor.execute(sql, [pred, i_gen + 1, completion, model, d["iex"], self.turn])
+                models_str: str = " AND ".join([f"model{i} = ?" for i in range(self.n_models())])
+                sql: str = (f"UPDATE {name} SET pred=?, i_gen=?, gen{i_gen}=? WHERE {models_str} AND iex=? AND turn=?;")
+                cursor.execute(sql, [pred, i_gen + 1, completion] + models + [d["iex"], self.turn])
         connection.commit()
 
     def get_results(self, model: str, top: int):
@@ -222,7 +232,7 @@ class Benchmark(ABC):
         n_gens: int = self.n_gens()
         data: list[dict] = self.get_input_data(model, n_gens)
         sql: str = (f"SELECT iex, pred FROM {self.database_name()} "
-            f"WHERE model = ? AND iex < ? AND i_gen = ? ORDER BY iex;")
+            f"WHERE model{self.active_model()} = ? AND iex < ? AND i_gen = ? ORDER BY iex;")
         query = cursor.execute(sql, [model, len(data), n_gens])
         labels = []
         pred = []
@@ -341,8 +351,18 @@ class BenchmarkChess960(Benchmark):
         connection.commit()
 
     @staticmethod
+    def n_models() -> int:
+        return 2
+
+    @staticmethod
     def n_turns() -> int:
         return config.chess960_n_halfturns
+
+    def database_columns(self) -> list[str]:
+        return super().database_columns() + ["moves"]
+
+    def database_types(self) -> list[str]:
+        return super().database_types() + ["TEXT"]
 
     @staticmethod
     def add_random_moves(random, moves: list[dict], iex: int, i_gen: int, turn: int) -> None:
@@ -398,40 +418,16 @@ class BenchmarkChess960(Benchmark):
 
         assert local_data.stockfish.is_fen_valid(state0)
         local_data.stockfish.set_fen_position(state0)
+        move_history: list[str] = []
 
         if turn > 0:
-            sql: str = f"SELECT pred FROM {database_name} WHERE model = ? AND iex = ? AND turn < ? ORDER BY turn;"
-            query: list = local_data.cursor.execute(sql, [model, iex, turn]).fetchall()
-            assert len(query) <= turn, f"len(query)={len(query)} turn={turn}"
-            if len(query) < turn:
+            sql: str = f"SELECT move_history FROM {database_name} WHERE model{(turn - 1) % 2} = ? AND iex = ? AND turn = ?;"
+            query: list = local_data.cursor.execute(sql, [model, iex, turn-1]).fetchall()
+            if not query:
                 data["skip"] = True
                 return
-            preds: list[int] = [q[0] for q in query]
-
-            for i in range(turn):
-                state: str = local_data.stockfish.get_fen_position()
-                board: chess.Board = chess.Board(state)
-                if board.outcome() is not None:
-                    data["skip"] = True
-                    return
-                sql: str = "SELECT moves, worst_legal_move FROM stockfish_cache WHERE fen=?;"
-                query: list = local_data.cursor.execute(sql, [state]).fetchall()
-                assert len(query) == 1, f"iex={iex} preds={preds} i={i} len(query)={len(query)}"
-                moves: list[dict] = json.loads(query[0][0])
-
-                permutation = [i for i in range(BenchmarkChess960.nchoices)]
-                local_data.random.seed(123456 + 1000*iex + i)
-                local_data.random.shuffle(permutation)
-                moves = [moves[p] for p in permutation]
-
-                move_uci: str = moves[preds[i]]["Move"]
-
-                if board.is_legal(chess.Move.from_uci(move_uci)):
-                    local_data.stockfish.make_moves_from_current_position([move_uci])
-                else:
-                    worst_legal_move_index: int = query[0][1]
-                    worst_legal_move_uci: str = moves[worst_legal_move_index]["Move"]
-                    local_data.stockfish.make_moves_from_current_position([worst_legal_move_uci])
+            move_history = json.loads(query[0][0])
+            local_data.stockfish.make_moves_from_current_position(move_history)
 
         state: str = local_data.stockfish.get_fen_position()
         if chess.Board(state).outcome() is not None:
@@ -515,6 +511,7 @@ Which of the following moves is the best one for {active_player} to take?
             prompt_suffix: str = "My final answer is ("
             grammar = f"root ::= [{''.join(LETTERS[:len(choices)])}]"
 
+        data["move_history"] = move_history
         data["messages"] = messages
         data["prompt_suffix"] = prompt_suffix
         data["grammar"] = grammar
@@ -522,6 +519,30 @@ Which of the following moves is the best one for {active_player} to take?
     @staticmethod
     def get_prediction(completion: str) -> int:
         return LETTERS.index(completion[:1])
+
+    def update_database(self, models: list[str], data: list[dict]):
+        super().update_database(models, data)
+
+        connection, cursor = get_db()
+        name: str = self.database_name()
+        n_gens: int = self.n_gens()
+        for d in data:
+            if d.get("skip", False):
+                continue
+            i_gen: int = d["i_gen"]
+            if i_gen + 1 < n_gens:
+                continue
+            completion: str = d["completion"]
+            moves: list[dict] = d["moves"]
+            move_history: list[str] = d["move_history"]
+            pred: int = self.get_prediction(completion)
+
+            move_history += moves[pred]["Move"]
+
+            models_str: str = " AND ".join([f"model{i} = ?" for i in range(self.n_models())])
+            sql: str = (f"UPDATE {name} SET move_history=? WHERE {models_str} AND iex=? AND turn=?;")
+            cursor.execute(sql, [json.dumps(move_history)] + models + [d["iex"], self.turn])
+        connection.commit()
 
     def get_results(self, model: str, top: int):
         assert top >= 1
